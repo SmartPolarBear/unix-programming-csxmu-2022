@@ -282,7 +282,7 @@ sync参数为可选，若有，则输出文件用O\_SYNC打开。例：
 
 \subsection{Makefile}
 
-首先使用Makefile作为构建系统。Makefile中的内容如\nameref{sec:code}中的代码~\ref{code:makefile}。
+首先使用Makefile作为构建系统。Makefile中的全部内容内容如\nameref{sec:code}中的代码~\ref{code:makefile}。
 其中，为了使用较新的语言特性来编写程序，因此在编译时使用了\textbf{-std=c99}选项启用C99标准，这启用了C99标准中的特性，
 可以使程序更符合现在的最佳实践。该部分如代码~\ref{code:c99}，给编译器额外传入参数\textbf{-std=c99}。
 
@@ -291,9 +291,11 @@ ${OUT}/timewrite.o: ${OUT} $(SRC)/timewrite.c
 	$(CC) -std=c99 -c $(SRC)/timewrite.c -o $(OUT)/timewrite.o
 \end{lstlisting}
 
+完整实现见\nameref{sec:code}中的代码~\ref{code:makefile}
+
 \subsection{程序实现}
 
-根据题目和流程图~\ref{fig:flowchart}实现程序如\nameref{sec:code}中的代码~\ref{code:impl}。
+根据题目和流程图~\ref{fig:flowchart}实现程序可见\textbf{\nameref{sec:code}}中的代码~\ref{code:impl}。
 该程序首先根据BUFFSIZE计算需要写入多少次才能完成所有数据的写入，然后调用\textbf{write()}来写入数据。
 在这个过程的桥后调用\textbf{times()}函数获得时钟信息，以Ticks为单位，最后使用\textbf{sysconf(\_SC\_CLK\_TCK)}
 获取的每秒Ticks数目得到具体的秒数。关键部分如代码~\ref{code:impl_key}。
@@ -347,7 +349,7 @@ for (int bufsize = 256;bufsize <= 131072;bufsize <<= 1)
 进行了测试\footnote{运行在i7-10800H、32GB内存下，使用Windows Hypervisior Platform虚拟化}，
 分别是Windows Subsystem for Linux（WSL）环境下的Ubuntu 22.04，
 WSL环境下的Ubuntu 22.04（访问Windows文件系统），VMWare虚拟机中的Ubuntu 22.04
-、MWare虚拟机中的FreeBSD（GhostBSD发行版）和课程服务器上的Linux 2.6。
+、VMWare虚拟机中的FreeBSD（GhostBSD发行版）和课程服务器上的Linux 2.6。
 这些不同的操作系统环境的主要特点如表~\ref{tbl:oss}。
 
 \begin{table}[htbp]
@@ -376,7 +378,7 @@ WSL环境下的Ubuntu 22.04（访问Windows文件系统），VMWare虚拟机中�
 这些实验涵盖了2种不同的类UNIX操作系统，涵盖了3种常见的文件系统，互相形成对照，
 能够较好地形成相互对照，并良好地反映出同步写入和异步写入的效率差异。
 
-测试数据使用\textbf{head -c 1310720 /dev/urandom>input}得到的1310720字节的
+测试数据使用\textbf{head -c 1310720 /dev/urandom > input}得到的1310720字节的
 随机数据。
 
 \subsection{实验方法}
@@ -552,6 +554,13 @@ GLibC进行系统调用的源码位置位于\textbf{sysdeps/unix/sysv/linux/i386
 进行统一。由于GCC的开源许可证要求过于苛刻，FreeBSD上编译并安装GCC较为困难，因此使用的Clang编译器。
 这对变量的控制产生的不利的影响。但是注意到该程序内容比较简单，同时没有启用较高的优化级别。因此这种
 误差可以忽略不计。
+
+\clearpage
+\section*{参考文献}
+\addcontentsline{toc}{part}{参考文献}
+
+\bibliographystyle{unsrt}
+\bibliography{reference}
 
 \clearpage
 \section*{附录：代码清单}
@@ -934,15 +943,6 @@ int main(int argc, char** argv)
 	\bottomrule
 \end{tabular}	
 \end{table}
-
-
-
-\clearpage
-\section*{参考文献}
-\addcontentsline{toc}{part}{参考文献}
-
-\bibliographystyle{unsrt}
-\bibliography{reference}
 
 \end{spacing}
 
