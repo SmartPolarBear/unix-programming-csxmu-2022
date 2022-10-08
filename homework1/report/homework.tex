@@ -162,6 +162,8 @@
 % 箭头形式
 \tikzstyle{arrow} = [->,>=stealth]
 
+\newtheorem{assumption}{Assumption}[section]
+
 \begin{document}
 	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -409,7 +411,7 @@ int main(int argc, char** argv)
 }
 \end{lstlisting}
 
-\section{实验结果}
+\section{实验设计和方法}
 
 \subsection{实验设计}
 
@@ -458,9 +460,9 @@ WSL环境下的Ubuntu 22.04（访问Windows文件系统），VMWare虚拟机中�
 
 不同平台的实验结果详细数据见\nameref{sec:appendix}
 
-\subsection{实验结论}
+\section{实验结论}
 
-\subsubsection{异步写在写入性能较差的介质和文件系统下有更强的加速效果}
+\subsection{异步写在写入性能较差的介质和文件系统下有更强的加速效果}
 
 WSL2中的Linux在写入Windows操作系统的分区时会出现较大的性能开销\cite{githubwsl2Filesystem}。
 因此，借助WSL2中的Linux访问\textbf{WSL2映像中的文件}和访问\textbf{Windows操作系统分区中的文件}的对比，
@@ -501,7 +503,7 @@ WSL2中的Linux在写入Windows操作系统的分区时会出现较大的性能�
 这一阈值在文件系统的读写效率较高时来的更早（图~\ref{fig:wsl}），这侧面印证了异步写入对性能本身
 较差的文件系统和存储介质的加速效果更好这一结论。
 
-\subsubsection{FreeBSD上的ZFS文件系统确实有优秀的的性能表现}
+\subsection{FreeBSD上的ZFS文件系统确实有优秀的的性能表现}
 
 BSD上的ZFS\cite{rodeh2003zfs}被证实具有良好的性能表现，不仅仅和ZFS on Linus相比，更能和EXT4等传统的
 文件系统相比\cite{freebsdzfs}。本次实验也证明了一点。统计不同操作系统上同步写入的时钟时间，如图~\ref{fig:allsync}。
@@ -517,19 +519,85 @@ BSD上的ZFS\cite{rodeh2003zfs}被证实具有良好的性能表现，不仅仅�
 我们应当采用先进技术，这样可以有效地提升性能。现如今IO瓶颈早已成为制约计算机性能的重要因素，因此采用性能良好的文件系统
 意义重大。
 
-\subsubsection{新的内核版本对减少系统调用开销有重大意义}
+\subsection{新的内核版本对减少系统调用开销有重大意义}
 
 \begin{figure}[htb]
 	\centering
-	\caption{不同操作系统上同步写入的时钟时间}
-	\label{fig:allsync2}
-	\includegraphics[width=0.4\textwidth]{clock.png}
+	\caption{服务器上的Linux 2.6具有异常高的写入开销}
+	\label{fig:allsync}
+	\includegraphics[width=0.4\textwidth]{clock_high.png}
 \end{figure}
 
-观察图~\ref{fig:allsync2}，可以发现在256的BUFFSIZE下，在学校服务器上运行该程序，写入时间相对而言特别长，而随着BUFFSIZE增加，
-这种对比完全消失了。那么这背后的原因是什么呢？
+观察图~\ref{fig:highsync}，可以发现在256的BUFFSIZE下，在学校服务器上运行该程序，写入时间相对而言特别长，而随着BUFFSIZE增加，
+这种对比完全消失了。那么\textbf{这种异常的高开销的原因是什么呢？}
 
-当BUFFSIZE为256时，需要调用512次\textbf{write()}才能 
+当BUFFSIZE为256时，需要调用512次\textbf{write()}才能写入全部数据，而每次调用\textbf{write()}都要进行系统调用。而从内核态切换到
+用户态是有开销的。特别是当系统调用的实现方式比较传统时，该开销是相当可观的。
+
+\subsubsection{Linux内核系统调用的实现}
+
+自CPU引入保护模式以来，应用程序开始只能工作在具有诸多限制的用户态。为了允许应用程序实现那些需要更高特权级的指令具有的功能，需要一种
+机制来允许应用程序进入内核态。这种机制在UNIX/类UNIX内核下就是系统调用。Linux内核的系统调用实现大致分为两个阶段。
+
+\begin{itemize}
+	\item \textbf{INT 80} 早期的Linux内核和当时绝大多数UNIX内核的系统调用都采用了软中断的形式。中断指令会自动将当前的状态保存在
+	栈中，然后将控制权移交给运行在内核态的中断处理程序。在Linux内核中，使用的中断是\textbf{INT 0x80}。并且系统调用的调用者会把系统调用编号
+	存储在EAX寄存器中。这样的机制的优点是系统调用的处理和中断的处理可以使用同一套机制，保存状态等过程实现简单。但是这种机制的缺点是并非所有的
+	寄存器都需要保存，因此这个读写内存的过程大大降低了处理系统调用的效率。
+
+	\item \textbf{sysenter/syexit和syscall/sysret}sysenter/syexit和syscall/sysret分别由Intel\cite{guide2011intel}和AMD\cite{amd2018amd64}引入，
+	用于快速地实现内核态和用户态的切换。它们没有寄存器状态入栈的内存操作，并且使用MSR寄存器来传递所需的信息。这样的机制有更高的性能。Linux内核在版本2.6中开始引入
+	基于这些指令实现的系统调用机制。
+\end{itemize}
+
+在Linux内核上进行系统调用依赖GLibC库。考虑到Linux 2.6刚刚引入新的快速系统调用机制，我作出假设~\ref{ass:syscall}：
+
+\begin{assumption}
+	\label{ass:syscall}
+	配套的GLibC库可能没有恰当地更新，以至于旧的系统调用机制仍然在使用，
+	这意味着较高的开销，再加上BUFFSIZE为256时较多的调用次数，使得总体开销显得过高。
+\end{assumption}
+
+\subsubsection{实验验证}
+
+为了验证这个猜想，我查阅了相应GLibC版本的源码。首先通过$ldd --version$命令获取了服务器上的GLibC版本是2.5。因此查找相应的分支的代码。
+GLibC进行系统调用的源码位置位于\textbf{sysdeps/unix/sysv/linux/i386/sysdep.h}。该文件为i386架构的可执行文件提供系统调用的实现。
+内容如图~\ref{fig:sysdepi386}。其中ENTER\_KERNEL的内容如图~\ref{fig:enterkernel}。
+
+\begin{figure}[htbp]
+	\centering
+	\caption{GLibC的系统调用实现}
+	\label{fig:acc}
+	\begin{subfigure}{0.4\textwidth}
+		\centering
+		\caption{sysdep.h}
+		\label{fig:sysdepi386}
+		\includegraphics[width=\textwidth]{syscall_entry.png}
+	\end{subfigure}
+	\begin{subfigure}{0.4\textwidth}
+		\centering
+		\caption{ENTER\_KERNEL}
+		\label{fig:enterkernel}
+		\includegraphics[width=\textwidth]{syscall.png}
+	\end{subfigure}
+\end{figure}
+
+可见32位系统调用实现由编译参数定义的宏的不同，可能使用旧的INT80机制的，这可能带来
+较大的开销。而对应的64位系统调用直接使用syscall/sysret指令组合，一定会
+使用新的系统调用机制。
+
+因此，为了验证猜想~\ref{ass:syscall}，我重新编译了64位版本的timewrite，运行结果如图~\ref{fig:64bit}。
+可以看出64位版本的timewrite的写入比32位版本快约50\%以上。从常识出发，这超出了字长的变化可能对性能带来的影响。
+因此可以认为节省的时间是由于系统调用实现机制的不同而导致的效率区别，进而可以认为猜想~\ref{ass:syscall}是正确的。
+
+\begin{figure}[htb]
+	\centering
+	\caption{64位版本与32位版本结果比较}
+	\label{fig:64bit}
+	\includegraphics[width=0.4\textwidth]{64bit.png}
+\end{figure}
+
+
 
 \section{实验体会}
 
@@ -539,6 +607,17 @@ BSD上的ZFS\cite{rodeh2003zfs}被证实具有良好的性能表现，不仅仅�
 \section*{附录：实验详细数据}
 \addcontentsline{toc}{part}{附录：实验详细数据}
 \label{sec:appendix}
+
+\subsection{WSL上的Ubuntu}
+
+\subsection{WSL上的Ubuntu（访问Windows文件系统）}
+
+\subsection{VMWare上的Ubuntu}
+
+\subsection{VMWare上的FreeBSD}
+
+\subsection{服务器上的Linux 2.6}
+
 
 \clearpage
 \section*{参考文献}
