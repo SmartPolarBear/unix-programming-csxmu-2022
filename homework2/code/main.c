@@ -2,6 +2,8 @@
 #include <dirent.h>
 #include <limits.h>
 
+#include <libgen.h> // basename
+
 
 typedef int (Callback)(const char*, const struct stat*, int);
 
@@ -13,7 +15,7 @@ static int myftw(char*, Callback*);
 
 static int dopath(Callback*);
 
-static int compare_file(const char* file1,const char* file2);
+static int compare_file(const char* file1, const char* file2);
 
 static long nreg, ndir, nblk, nchr, nfifo, nslink, nsock, ntot, nless4k;
 
@@ -200,7 +202,10 @@ static int content_compare(const char* pathname, const struct stat* statptr, int
             if (statptr->st_size > 0) {
                 if (statptr->st_size == comp_stat.st_size &&
                     compare_file(pathname, comp_filename)) {
-                    printf("%s", pathname);
+
+                    char* real = realpath(pathname, NULL);
+                    printf("%s\n", real);
+                    free(real);
                 }
             }
             break;
@@ -234,10 +239,9 @@ static int name_compare(const char* pathname, const struct stat* statptr, int ty
         case S_IFSOCK:
             for (int i = 0;i < name_count;i++)
             {
-                if (strcmp(pathname, names[i]) == 0)
+                if (strcmp(basename(pathname), names[i]) == 0)
                 {
-                    printf("%s", pathname);
-
+                    printf("%s\n", pathname);
                 }
             }
             break;
