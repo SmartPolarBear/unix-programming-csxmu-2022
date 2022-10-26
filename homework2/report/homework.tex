@@ -20,6 +20,7 @@
 \usepackage{graphicx}
 \usepackage{epsfig}
 \usepackage{float}
+\usepackage{wrapfig}
 
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
@@ -266,11 +267,108 @@ myfind  \textlangle pathname\textrangle \ [-comp \textlangle filename\textrangle
 
 \subsection{程序设计}
 
+\begin{wrapfigure}{r}{0.5\textwidth}
+	\centering
+	\caption{流程图}
+	\label{fig:flowchart}
+	\begin{tikzpicture}[node distance=1cm]
+		%定义流程图具体形状
+		\node[startstop](start){进入回调函数};
+		\node[decision, below of = start, yshift = -1cm](dec1){参数3是否为$FTW\_F$?};
+		\node[process, below of = dec1, yshift = -1cm](write){执行相应查找功能};
+		\node[io, below of = write, yshift = -1cm](out1){输出路径};
+		\node[startstop, below of = out1, yshift = -1cm](stop){结束};
+		\coordinate (point1) at (-3cm, -2cm);
+		%连接具体形状
+		\draw [arrow] (start) -- (dec1);
+		\draw (dec1) -- node [above] {N} (point1);
+		\draw [arrow] (point1) |- (stop);
+		\draw [arrow] (write) -- (out1);
+		\draw [arrow] (dec1) -- node [right] {Y} (write);
+		\draw [arrow] (out1) -- (stop);
+
+	\end{tikzpicture}
+\end{wrapfigure}
+
+
+首先简单地分析课本程序4-7。$myftw$接受一个路径和一个回调函数作为参数。它为路径分配内存，
+然后调用$dopath$完成路径遍历的实际功能。$dopath$中通过$lstat$获取文件的信息，然后调用
+回调函数。其中调用的第三个参数将遍历到的文件系统节点分为了文件、目录、不可读的目录、不能执行$stat$的
+文件4类。然后$dopath$对可读的目录进行递归调用。这样实现了对目录树的先序遍历。
+
+由于$myftw$提供了基本可用的接口来在遍历目录树的时候进行自定义的操作，为了完成实验要求，就需要实现3个
+不同的回调函数，分别对应3个命令的功能。其中功能1只需要微调4-7中的$myfunc$。其它两个功能则需要在
+文件可读的情况下完成相应的操作。如图~\ref{fig:flowchart}。
+
+
 \subsection{程序实现}
+
+代码见\nameref{sec:code}中的代码~\ref{code:impl}。任务1的实现较为简单，只需要在回调函数的参数3为FTW\_F且文件类型是S\_IFREG时，进一步
+判断文件的大小是否为4096即可。
+
+为了实现2和3，需要进行相对路径和绝对路径的转换，以及从路径中提取文件名。这里使用了
+两个POSIX标准的函数，分别是$realpath$和$basename$。$realpath$可以将相对路径转换为绝对路径，
+而$basename$可以从路径中提取文件名。
+
+功能2需要对文件内容进行读取，然后逐字节比较是否一致；功能3需要先把参数复制到一个数组中，然后每次
+遍历到有效的文件就用$basename$获取文件名，然后遍历查找是否在给定的参数中存在。
 
 \section{程序测试}
 
+为了测试程序的正确性，首先需要准备测试用例。这里使用了一个多层嵌套的目录树，其中某些文件具有相同的内容，另一些
+文件有不同的内容，如图~\ref{fig:tree}。运行结果如图~\ref{fig:results}。可见实现是正确的。
+
+\begin{figure}[htb]
+	\centering
+	\caption{运行结果}
+	\label{fig:results}
+	\begin{subfigure}{0.4\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{f2.png}
+		\caption{功能2}
+		\label{fig:f2}
+	\end{subfigure}
+	\begin{subfigure}{0.4\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{f3.png}
+		\caption{功能3}
+		\label{fig:f3}
+	\end{subfigure}
+\end{figure}
+
+
+\begin{figure}[htb]
+    \centering
+    \caption{测试目录树}
+    \label{fig:tree}
+    \includegraphics[width=0.4\textwidth]{tree.png}
+\end{figure}
+
 \section{问题与改进}
+
+为了进一步提高实现功能3的效率，可以在查找文件名时使用字典树这一数据结构，避免
+多次重复比较前缀。例如图~\ref{fig:trie}
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}[main/.style = {draw, circle}] 
+		\node[main] (a) {$a$}; 
+		\node[main] (b) [below right of=a] {$b$}; 
+		\node[main] (e) [below left of=a] {$e$}; 
+		\node[main] (c) [below left of=b] {$c$}; 
+		\node[main] (d) [below right of=b] {$d$}; 
+
+		\draw[->] (a) edge node[above,draw=none,fill=none]{} (b);
+		\draw[->] (a) edge node[above,draw=none,fill=none]{} (e);
+		\draw[->] (b) edge node[left,draw=none,fill=none]{} (c);
+		\draw[->] (b) edge node[left,draw=none,fill=none]{} (d);
+
+	
+	\end{tikzpicture} 
+	\caption{字典树示例}
+	\label{fig:trie}
+\end{figure}
+图~\ref{fig:trie}是为了查找文件名ae、abc、abd形成的字典树。在查找时，可以从根节点开始，逐层向下遍历。
+这样这些路径共同的前缀a、ab等都只比较了一遍，能够大大提升效率。
 
 \appendix
 \clearpage
