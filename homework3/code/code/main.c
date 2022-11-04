@@ -7,6 +7,8 @@
 
 #include "parser.h"
 
+extern char **environ;
+
 #define BUFMAX 4096
 
 char cmd_buf[BUFMAX];
@@ -49,7 +51,10 @@ int main()
 
 			if (WIFEXITED(status))
 			{
-				printf("Process exit with status %d.\n", WEXITSTATUS(status));
+				if(WEXITSTATUS(status)!=0)
+				{
+					printf("Process exit with status %d.\n", WEXITSTATUS(status));
+				}
 			}
 			else if (WIFSIGNALED(status))
 			{
@@ -88,9 +93,9 @@ void run_command(command_t *cmd)
 		{
 			exit(0);
 		}
-		int err = execve(exec_cmd->argv[0], exec_cmd->argv, NULL);
+		int err = execve(exec_cmd->argv[0], exec_cmd->argv, environ);
 		err_exit(err, "execve error");
-		// not breakthrough
+		// should not fall through
 	case CMD_REDIR:
 		break;
 	case CMD_PIPE:
