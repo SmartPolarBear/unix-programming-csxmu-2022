@@ -3,6 +3,7 @@ OBJS = main.o \
 	   pathalloc.o \
 	   parser.o \
 	   scanner.o \
+	   findcmd.o \
 
 CC = gcc
 CFLAGS = -Wall -g -std=c99

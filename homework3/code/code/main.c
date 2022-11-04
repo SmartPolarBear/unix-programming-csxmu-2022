@@ -8,6 +8,8 @@
 #include <sys/wait.h>
 
 #include "parser.h"
+#include "scanner.h"
+#include "findcmd.h"
 
 extern char **environ;
 
@@ -120,7 +122,8 @@ void run_command(command_t *cmd)
 		{
 			exit(0);
 		}
-		err = execve(ecmd->argv[0], ecmd->argv, environ);
+		char *name = find_in_path(ecmd->argv[0], getenv("PATH"));
+		err = execve(name, ecmd->argv, environ);
 		err_exit(err, "exec %s failed\n", ecmd->argv[0]);
 		break;
 
@@ -131,7 +134,6 @@ void run_command(command_t *cmd)
 		if (err < 0)
 		{
 			err_exit(err, "open %s failed\n", rcmd->file);
-			exit(0);
 		}
 		run_command(rcmd->cmd);
 		break;
