@@ -1,6 +1,8 @@
 OBJS = main.o \
 	   error.o \
 	   pathalloc.o \
+	   parser.o \
+	   scanner.o \
 
 CC = gcc
 CFLAGS = -Wall -g -std=c99
@@ -8,12 +10,12 @@ CFLAGS = -Wall -g -std=c99
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-myfind: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o myfind
+myshell: $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o $@
 
-all: myfind
+all: myshell
 
 clean:
-	rm -f *.o myfind
+	rm -f *.o myshell
 
 .PHONY: clean all
