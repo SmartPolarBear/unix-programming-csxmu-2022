@@ -20,6 +20,7 @@ typedef struct exec_command
 {
 	command_t base;
 	char *argv[MAXARGS];
+	char *eargv[MAXARGS];
 } exec_command_t;
 
 typedef struct redir_command

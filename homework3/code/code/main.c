@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <limits.h>
 #include <sys/wait.h>
 
@@ -15,6 +17,16 @@ char cmd_buf[BUFMAX];
 
 int get_command(char *buf, int nbuf);
 void run_command(command_t *cmd);
+
+int fork_panic()
+{
+	int pid = fork();
+	if (pid < 0)
+	{
+		err_exit(pid, "fork");
+	}
+	return pid;
+}
 
 int main()
 {
@@ -51,7 +63,7 @@ int main()
 
 			if (WIFEXITED(status))
 			{
-				if(WEXITSTATUS(status)!=0)
+				if (WEXITSTATUS(status) != 0)
 				{
 					printf("Process exit with status %d.\n", WEXITSTATUS(status));
 				}
@@ -84,25 +96,91 @@ int get_command(char *buf, int nbuf)
 
 void run_command(command_t *cmd)
 {
-	exec_command_t *exec_cmd = NULL;
+	int p[2];
+	int err;
+	back_command_t *bcmd;
+	exec_command_t *ecmd;
+	list_command_t *lcmd;
+	pipe_command_t *pcmd;
+	redir_command_t *rcmd;
+
+	if (cmd == 0)
+	{
+		exit(0);
+	}
+
 	switch (cmd->type)
 	{
+	default:
+		err_quit("run_command");
+
 	case CMD_EXEC:
-		exec_cmd = (exec_command_t *)cmd;
-		if (exec_cmd->argv[0] == NULL)
+		ecmd = (exec_command_t *)cmd;
+		if (ecmd->argv[0] == 0)
 		{
 			exit(0);
 		}
-		int err = execve(exec_cmd->argv[0], exec_cmd->argv, environ);
-		err_exit(err, "execve error");
-		// should not fall through
+		err = execve(ecmd->argv[0], ecmd->argv, environ);
+		err_exit(err, "exec %s failed\n", ecmd->argv[0]);
+		break;
+
 	case CMD_REDIR:
+		rcmd = (redir_command_t *)cmd;
+		close(rcmd->fd);
+		err = open(rcmd->file, rcmd->mode);
+		if (err < 0)
+		{
+			err_exit(err, "open %s failed\n", rcmd->file);
+			exit(0);
+		}
+		run_command(rcmd->cmd);
 		break;
-	case CMD_PIPE:
-		break;
+
 	case CMD_LIST:
+		lcmd = (list_command_t *)cmd;
+		if (fork_panic() == 0)
+		{
+			run_command(lcmd->left);
+		}
+		wait(NULL);
+		run_command(lcmd->right);
 		break;
+
+	case CMD_PIPE:
+		pcmd = (pipe_command_t *)cmd;
+		if (pipe(p) < 0)
+		{
+			err_quit("pipe");
+		}
+		if (fork_panic() == 0)
+		{
+			close(1);
+			dup(p[1]);
+			close(p[0]);
+			close(p[1]);
+			run_command(pcmd->left);
+		}
+		if (fork_panic() == 0)
+		{
+			close(0);
+			dup(p[0]);
+			close(p[0]);
+			close(p[1]);
+			run_command(pcmd->right);
+		}
+		close(p[0]);
+		close(p[1]);
+		wait(NULL);
+		wait(NULL);
+		break;
+
 	case CMD_BACK:
+		bcmd = (back_command_t *)cmd;
+		if (fork_panic() == 0)
+		{
+			run_command(bcmd->cmd);
+		}
 		break;
 	}
+	exit(0);
 }

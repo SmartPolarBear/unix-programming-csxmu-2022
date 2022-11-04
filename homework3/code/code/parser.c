@@ -4,8 +4,10 @@
 #include "apue.h"
 
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include "parser.h"
+#include "scanner.h"
 
 static inline exec_command_t *make_exec_command(void)
 {
@@ -52,48 +54,198 @@ static inline back_command_t *make_back_command(command_t *subcmd)
 	return cmd;
 }
 
-char *begins[MAXARGS] = {NULL};
-char *ends[MAXARGS] = {NULL};
+command_t *parse_line(char **ps, char *es);
+command_t *parse_pipe(char **ps, char *es);
+command_t *parse_exec(char **ps, char *es);
+command_t *parse_redirs(command_t *cmd, char **ps, char *es);
+command_t *ensure_nulterm(command_t *cmd);
+
+command_t *
+parse_line(char **ps, char *es)
+{
+	command_t *cmd;
+
+	cmd = parse_pipe(ps, es);
+	while (peek(ps, es, "&"))
+	{
+		get_token(ps, es, 0, 0);
+		cmd = (command_t *)make_back_command(cmd);
+	}
+	if (peek(ps, es, ";"))
+	{
+		get_token(ps, es, 0, 0);
+		cmd = (command_t *)make_list_command(cmd, parse_line(ps, es));
+	}
+	return cmd;
+}
+
+command_t *
+parse_pipe(char **ps, char *es)
+{
+	command_t *cmd;
+
+	cmd = parse_exec(ps, es);
+	if (peek(ps, es, "|"))
+	{
+		get_token(ps, es, 0, 0);
+		cmd = (command_t *)make_pipe_command(cmd, parse_pipe(ps, es));
+	}
+	return cmd;
+}
+
+command_t *
+parse_redirs(command_t *cmd, char **ps, char *es)
+{
+	int tok;
+	char *q, *eq;
+
+	while (peek(ps, es, "<>"))
+	{
+		tok = get_token(ps, es, 0, 0);
+		if (get_token(ps, es, &q, &eq) != 'a')
+		{
+			err_quit("missing file for redirection");
+		}
+		switch (tok)
+		{
+		case '<':
+			cmd = (command_t *)make_redir_command(cmd, q, eq, O_RDONLY, 0);
+			break;
+		case '>':
+			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, 1);
+			break;
+		case '+':  // >>
+			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, 1);
+			break;
+		}
+	}
+	return cmd;
+}
+
+command_t *
+parseblock(char **ps, char *es)
+{
+	command_t *cmd;
+
+	if (!peek(ps, es, "("))
+	{
+		err_quit("parseblock");
+	}
+	get_token(ps, es, 0, 0);
+	cmd = parse_line(ps, es);
+	if (!peek(ps, es, ")"))
+	{
+		err_quit("syntax - missing )");
+	}
+	get_token(ps, es, 0, 0);
+	cmd = parse_redirs(cmd, ps, es);
+	return cmd;
+}
+
+command_t *
+parse_exec(char **ps, char *es)
+{
+	char *q, *eq;
+	int tok, argc;
+	exec_command_t *cmd;
+	command_t *ret;
+
+	if (peek(ps, es, "("))
+	{
+		return parseblock(ps, es);
+	}
+
+	ret = (command_t *)make_exec_command();
+	cmd = (exec_command_t *)ret;
+
+	argc = 0;
+	ret = parse_redirs(ret, ps, es);
+	while (!peek(ps, es, "|)&;"))
+	{
+		if ((tok = get_token(ps, es, &q, &eq)) == 0)
+		{
+			break;
+		}
+		if (tok != 'a')
+		{
+			err_quit("syntax");
+		}
+		cmd->argv[argc] = q;
+		cmd->eargv[argc] = eq;
+		argc++;
+		if (argc >= MAXARGS)
+		{
+			err_quit("too many args");
+		}
+		ret = parse_redirs(ret, ps, es);
+	}
+	cmd->argv[argc] = 0;
+	cmd->eargv[argc] = 0;
+	return ret;
+}
+
+// NUL-terminate all the counted strings.
+command_t *
+ensure_nulterm(command_t *cmd)
+{
+	int i;
+	back_command_t *bcmd;
+	exec_command_t *ecmd;
+	list_command_t *lcmd;
+	pipe_command_t *pcmd;
+	redir_command_t *rcmd;
+
+	if (cmd == 0)
+	{
+		return 0;
+	}
+
+	switch (cmd->type)
+	{
+	case CMD_EXEC:
+		ecmd = (exec_command_t *)cmd;
+		for (i = 0; ecmd->argv[i]; i++)
+			*ecmd->eargv[i] = 0;
+		break;
+
+	case CMD_REDIR:
+		rcmd = (redir_command_t *)cmd;
+		ensure_nulterm(rcmd->cmd);
+		*rcmd->efile = 0;
+		break;
+
+	case CMD_PIPE:
+		pcmd = (pipe_command_t *)cmd;
+		ensure_nulterm(pcmd->left);
+		ensure_nulterm(pcmd->right);
+		break;
+
+	case CMD_LIST:
+		lcmd = (list_command_t *)cmd;
+		ensure_nulterm(lcmd->left);
+		ensure_nulterm(lcmd->right);
+		break;
+
+	case CMD_BACK:
+		bcmd = (back_command_t *)cmd;
+		ensure_nulterm(bcmd->cmd);
+		break;
+	}
+	return cmd;
+}
 
 command_t *parse_command(char *cmdline)
 {
-//	char *cbeg = cmdline, *cend = cmdline;
-//	while (*cend)
-//		cend++;
-//
-//	command_t *cmd = parse_line(&cbeg, cend);
-//	peek_token(&cbeg, cend, "");
-//	if (cbeg != cend)
-//	{
-//		err_quit("syntax error with leftovers: %s\n", cbeg);
-//	}
-//	nulterminate(cmd);
-//	return cmd;
+	char *cbeg = cmdline, *cend = cmdline;
+	while (*cend)
+		cend++;
 
-	int argc = 0;
-	char *cbeg = cmdline, *cend = cmdline + strlen(cmdline);
-	begins[argc] = cmdline;
-	for (char *p = cbeg; p < cend; p++)
+	command_t *cmd = parse_line(&cbeg, cend);
+	peek(&cbeg, cend, "");
+	if (cbeg != cend)
 	{
-		if (p != cbeg && *(p - 1) == ' ' && *p != ' ')
-		{
-			ends[argc] = p - 1;
-			while (ends[argc] > begins[argc] && ends[argc][-1] == ' ')
-				ends[argc]--;
-
-			begins[++argc] = p;
-		}
+		err_quit("syntax error with leftovers: %s\n", cbeg);
 	}
-	ends[argc] = cend;
-	argc++;
-
-	exec_command_t *cmd = make_exec_command();
-	for (int i = 0; i < argc; i++)
-	{
-		cmd->argv[i] = calloc(ends[i] - begins[i] + 1, sizeof(char));
-		strncpy(cmd->argv[i], begins[i], ends[i] - begins[i]);
-	}
-	cmd->argv[argc - 1][strlen(cmd->argv[argc - 1]) - 1] = '\0';
-	cmd->argv[argc] = NULL;
+	ensure_nulterm(cmd);
 	return cmd;
 }
