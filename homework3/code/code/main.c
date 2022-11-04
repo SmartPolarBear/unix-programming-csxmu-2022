@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <sys/wait.h>
+#include <assert.h>
 
 #include "parser.h"
 #include "scanner.h"
@@ -100,6 +101,9 @@ void run_command(command_t *cmd)
 {
 	int p[2];
 	int err;
+	int fd;
+	int pid, pid1, pid2;
+
 	back_command_t *bcmd;
 	exec_command_t *ecmd;
 	list_command_t *lcmd;
@@ -129,22 +133,24 @@ void run_command(command_t *cmd)
 
 	case CMD_REDIR:
 		rcmd = (redir_command_t *)cmd;
-		close(rcmd->fd);
-		err = open(rcmd->file, rcmd->mode);
-		if (err < 0)
+		fd = open(rcmd->file, rcmd->mode | O_SYNC | O_TRUNC);
+		if (fd < 0)
 		{
-			err_exit(err, "open %s failed\n", rcmd->file);
+			err_exit(fd, "open %s failed\n", rcmd->file);
 		}
+		dup2(fd, rcmd->fd);
+		close(fd);
 		run_command(rcmd->cmd);
 		break;
 
 	case CMD_LIST:
 		lcmd = (list_command_t *)cmd;
-		if (fork_panic() == 0)
+		pid = fork_panic();
+		if (pid == 0)
 		{
 			run_command(lcmd->left);
 		}
-		wait(NULL);
+		waitpid(pid, NULL, 0);
 		run_command(lcmd->right);
 		break;
 
@@ -154,26 +160,24 @@ void run_command(command_t *cmd)
 		{
 			err_quit("pipe");
 		}
-		if (fork_panic() == 0)
+		if ((pid1 = fork_panic()) == 0)
 		{
-			close(1);
-			dup(p[1]);
+			dup2(p[1], STDOUT_FILENO);
 			close(p[0]);
 			close(p[1]);
 			run_command(pcmd->left);
 		}
-		if (fork_panic() == 0)
+		if ((pid2 = fork_panic()) == 0)
 		{
-			close(0);
-			dup(p[0]);
+			dup2(p[0], STDIN_FILENO);
 			close(p[0]);
 			close(p[1]);
 			run_command(pcmd->right);
 		}
 		close(p[0]);
 		close(p[1]);
-		wait(NULL);
-		wait(NULL);
+		waitpid(pid1, NULL, 0);
+		waitpid(pid2, NULL, 0);
 		break;
 
 	case CMD_BACK:

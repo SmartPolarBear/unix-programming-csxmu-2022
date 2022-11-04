@@ -109,13 +109,13 @@ parse_redirs(command_t *cmd, char **ps, char *es)
 		switch (tok)
 		{
 		case '<':
-			cmd = (command_t *)make_redir_command(cmd, q, eq, O_RDONLY, 0);
+			cmd = (command_t *)make_redir_command(cmd, q, eq, O_RDONLY, STDIN_FILENO);
 			break;
 		case '>':
-			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, 1);
+			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, STDOUT_FILENO);
 			break;
 		case '+':  // >>
-			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, 1);
+			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, STDOUT_FILENO);
 			break;
 		}
 	}
@@ -123,13 +123,13 @@ parse_redirs(command_t *cmd, char **ps, char *es)
 }
 
 command_t *
-parseblock(char **ps, char *es)
+parse_paren(char **ps, char *es)
 {
 	command_t *cmd;
 
 	if (!peek(ps, es, "("))
 	{
-		err_quit("parseblock");
+		err_quit("parse_paren");
 	}
 	get_token(ps, es, 0, 0);
 	cmd = parse_line(ps, es);
@@ -152,7 +152,7 @@ parse_exec(char **ps, char *es)
 
 	if (peek(ps, es, "("))
 	{
-		return parseblock(ps, es);
+		return parse_paren(ps, es);
 	}
 
 	ret = (command_t *)make_exec_command();
