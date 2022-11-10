@@ -133,7 +133,7 @@ void run_command(command_t *cmd)
 
 	case CMD_REDIR:
 		rcmd = (redir_command_t *)cmd;
-		fd = open(rcmd->file, rcmd->mode | O_SYNC | O_TRUNC);
+		fd = open(rcmd->file, rcmd->mode | O_SYNC );
 		if (fd < 0)
 		{
 			err_exit(fd, "open %s failed\n", rcmd->file);
