@@ -1,0 +1,522 @@
+\documentclass[a4paper,twoside]{article}
+\usepackage{blindtext}  
+\usepackage{geometry}
+
+% Chinese support
+\usepackage[UTF8, scheme = plain]{ctex}
+
+% Page margin layout
+\geometry{left=2.3cm,right=2cm,top=2.5cm,bottom=2.0cm}
+
+
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{hyperref}
+
+\usepackage{graphics}
+\usepackage{graphicx}
+\usepackage{epsfig}
+\usepackage{float}
+\usepackage{wrapfig}
+
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+\usepackage{booktabs}
+\usepackage{threeparttable}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{multicol}
+
+\usepackage{caption}
+\usepackage{subcaption}
+
+% cite package, to clean up citations in the main text. Do not remove.
+\usepackage{cite}
+
+\usepackage{color,xcolor}
+
+%% The amssymb package provides various useful mathematical symbols
+\usepackage{amssymb}
+%% The amsthm package provides extended theorem environments
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{enumerate}
+\usepackage{enumitem}
+\usepackage{listings}
+
+\usepackage{textcomp}
+
+\usepackage{indentfirst}
+\setlength{\parindent}{2em} % Make two letter space in the first paragraph
+\usepackage{setspace}
+\linespread{1.5} % Line spacing setting
+\usepackage{siunitx}
+\setlength{\parskip}{0.5em} % Paragraph spacing setting
+
+% \usepackage[contents =22920202204622, scale = 10, color = black, angle = 50, opacity = .10]{background}
+
+\renewcommand{\figurename}{图}
+\renewcommand{\lstlistingname}{代码} 
+\renewcommand{\tablename}{表格}
+\renewcommand{\contentsname}{目录}
+\floatname{algorithm}{算法}
+
+\graphicspath{ {images/} }
+
+%%%%%%%%%%%%%
+\newcommand{\StudentNumber}{22920202204622}  % Fill your student number here
+\newcommand{\StudentName}{熊恪峥}  % Replace your name here
+\newcommand{\PaperTitle}{实验（五） 编写程序myfind}  % Change your paper title here
+\newcommand{\PaperType}{Unix程序设计} % Replace the type of your report here
+\newcommand{\Date}{2022年11月23日}
+\newcommand{\College}{信息学院}
+\newcommand{\CourseName}{Unix程序设计}
+%%%%%%%%%%%%%
+
+%% Page header and footer setting
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\pagestyle{fancy}
+\fancyhf{}
+% This requires the document to be twoside
+\fancyhead[LO]{\texttt{\StudentName }}
+\fancyhead[LE]{\texttt{\StudentNumber}}
+\fancyhead[C]{\texttt{\PaperTitle }}
+\fancyhead[R]{\texttt{第{\thepage}页，共\pageref*{LastPage}页}}
+
+
+\title{\PaperTitle}
+\author{\StudentName}
+\date{\Date}
+
+\lstset{
+	basicstyle          =   \sffamily,          % 基本代码风格
+	keywordstyle        =   \bfseries,          % 关键字风格
+	commentstyle        =   \rmfamily\itshape,  % 注释的风格，斜体
+	stringstyle         =   \ttfamily,  % 字符串风格
+	flexiblecolumns,                % 别问为什么，加上这个
+	numbers             =   left,   % 行号的位置在左边
+	showspaces          =   false,  % 是否显示空格，显示了有点乱，所以不现实了
+	numberstyle         =   \zihao{-5}\ttfamily,    % 行号的样式，小五号，tt等宽字体
+	showstringspaces    =   false,
+	captionpos          =   t,      % 这段代码的名字所呈现的位置，t指的是top上面
+	frame               =   lrtb,   % 显示边框
+}
+
+\lstdefinestyle{PythonStyle}{
+	language        =   Python, % 语言选Python
+	basicstyle      =   \zihao{-5}\ttfamily,
+	numberstyle     =   \zihao{-5}\ttfamily,
+	keywordstyle    =   \color{blue},
+	keywordstyle    =   [2] \color{teal},
+	stringstyle     =   \color{magenta},
+	commentstyle    =   \color{red}\ttfamily,
+	breaklines      =   true,   % 自动换行，建议不要写太长的行
+	columns         =   fixed,  % 如果不加这一句，字间距就不固定，很丑，必须加
+	basewidth       =   0.5em,
+}
+
+\definecolor{keycolor}{RGB}{172, 42, 42}
+\definecolor{mbleu}{RGB}{64,96,127}
+\definecolor{vimvert}{RGB}{46, 139, 87}
+
+\lstdefinestyle{MakefileBaseStyle}{
+basicstyle=\ttfamily\scriptsize\color{black!90},%
+stringstyle=\itshape\color{magenta},%
+showstringspaces=false,%
+keywordstyle=\bfseries\color{keycolor},%
+commentstyle=\color{blue}\slshape,%
+framexleftmargin=1mm,%
+backgroundcolor=\color{black!2},%
+}
+
+\lstdefinestyle{MakefileStyle}{
+	otherkeywords={.SUFFIXES},
+	morekeywords={SUFFIX, CPP_,},
+	moredelim=[is][\color{mbleu}]{/*}{*/},
+	style=MakefileBaseStyle,%
+	morecomment=[l][commentstyle]{\#},%
+	emphstyle={\color{vimvert}},%
+	moredelim=[s][\color{vimvert}]{\$(}{)}%
+}
+
+\lstdefinestyle{CppStyle}{
+	language        =   c++,
+	basicstyle      =   \zihao{-5}\ttfamily,
+	numberstyle     =   \zihao{-5}\ttfamily,
+	keywordstyle    =   \color{blue},
+	keywordstyle    =   [2] \color{teal},
+	stringstyle     =   \color{magenta},
+	commentstyle    =   \color{red}\ttfamily,
+	breaklines      =   true,   % 自动换行，建议不要写太长的行
+	columns         =   fixed,  % 如果不加这一句，字间距就不固定，很丑，必须加
+	basewidth       =   0.5em,
+}
+
+\algnewcommand\algorithmicinput{\textbf{Input:}}
+\algnewcommand\algorithmicoutput{\textbf{Output:}}
+\algnewcommand\Input{\item[\algorithmicinput]}%
+\algnewcommand\Output{\item[\algorithmicoutput]}%
+
+\usetikzlibrary{positioning, shapes.geometric}
+
+% 流程图定义基本形状
+\tikzstyle{startstop} = [rectangle, rounded corners, minimum width = 2cm, minimum height=1cm,text centered, draw = black]
+\tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=2cm, minimum height=1cm, text centered, draw=black]
+\tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black]
+\tikzstyle{decision} = [diamond, aspect = 3, text centered, draw=black]
+% 箭头形式
+\tikzstyle{arrow} = [->,>=stealth]
+
+\newtheorem{assumption}{Assumption}[section]
+
+\begin{document}
+	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\makeatletter % change default title style
+\renewcommand*\maketitle{%
+	\begin{center} 
+		\bfseries  % title 
+		{\LARGE \@title \par}  % LARGE typesetting
+		\vskip 1em  %  margin 1em
+		{\global\let\author\@empty}  % no author information
+		{\global\let\date\@empty}  % no date
+		\thispagestyle{empty}   %  empty page style
+	\end{center}%
+	\setcounter{footnote}{0}%
+}
+\makeatother
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	
+	
+\thispagestyle{empty}
+
+\vspace*{1cm}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=4.0cm]{logo.png}
+\end{figure}
+
+\vspace*{1cm}
+
+\begin{center}
+	\Huge{\textbf{\PaperType}}
+	
+	\Large{\PaperTitle}
+\end{center}
+
+\vspace*{1cm}
+
+\begin{table}[h]
+	\centering	
+	\begin{Large}
+		\renewcommand{\arraystretch}{1.5}
+		\begin{tabular}{p{3cm} p{5cm}<{\centering}}
+			姓\qquad 名 & \StudentName  \\
+			\hline
+			学\qquad号 & \StudentNumber \\
+			\hline
+			日\qquad期 & \Date  \\
+			\hline
+			学\qquad院 & \College  \\
+			\hline
+			课程名称 & \CourseName  \\
+			\hline
+		\end{tabular}
+	\end{Large}
+\end{table}
+
+\newpage
+
+\title{
+	\Large{\textcolor{black}{\PaperTitle}}
+}
+	
+	
+\maketitle
+	
+\tableofcontents
+ 
+\newpage
+\setcounter{page}{1}
+
+\begin{spacing}{1.2}
+
+\section{实验内容}
+
+编写程序myfind
+
+\subsection{命令语法}
+myfind  \textlangle pathname\textrangle \ [-comp \textlangle filename\textrangle \ \textbar \ -name \textlangle str\textrangle  …]
+
+\subsection{命令语义}
+
+\begin{enumerate}
+	\item myfind  \textlangle pathname\textrangle 的功能：除了具有与程序4-7相同的功能外，还要输出在\textlangle pathname\textrangle  目录子树之下，文件长度不小于4096字节的常规文件的数量。程序不允许打印出任何路径名。
+\end{enumerate}
+
+\section{程序设计与实现}
+
+\subsection{程序设计}
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+	\centering
+	\caption{流程图}
+	\label{fig:flowchart}
+	\begin{tikzpicture}[node distance=1cm]
+		%定义流程图具体形状
+		\node[startstop](start){进入回调函数};
+		\node[decision, below of = start, yshift = -1cm](dec1){参数3是否为$FTW\_F$?};
+		\node[process, below of = dec1, yshift = -1cm](write){执行相应查找功能};
+		\node[io, below of = write, yshift = -1cm](out1){输出路径};
+		\node[startstop, below of = out1, yshift = -1cm](stop){结束};
+		\coordinate (point1) at (-3cm, -2cm);
+		%连接具体形状
+		\draw [arrow] (start) -- (dec1);
+		\draw (dec1) -- node [above] {N} (point1);
+		\draw [arrow] (point1) |- (stop);
+		\draw [arrow] (write) -- (out1);
+		\draw [arrow] (dec1) -- node [right] {Y} (write);
+		\draw [arrow] (out1) -- (stop);
+
+	\end{tikzpicture}
+\end{wrapfigure}
+
+
+首先简单地分析课本程序4-7。$myftw$接受一个路径和一个回调函数作为参数。它为路径分配内存，
+然后调用$dopath$完成路径遍历的实际功能。$dopath$中通过$lstat$获取文件的信息，然后调用
+回调函数。其中调用的第三个参数将遍历到的文件系统节点分为了文件、目录、不可读的目录、不能执行$stat$的
+文件4类。然后$dopath$对可读的目录进行递归调用。这样实现了对目录树的先序遍历。
+
+由于$myftw$提供了基本可用的接口来在遍历目录树的时候进行自定义的操作，为了完成实验要求，就需要对应的回调函数。
+只需要微调4-7中的$myfunc$，当文件尺寸比4096大时进行计数，就能完成所需要的功能。
+
+
+\subsection{程序实现}
+
+代码见\nameref{sec:code}中的代码~\ref{code:impl}。任务1的实现较为简单，只需要在回调函数的参数3为FTW\_F且文件类型是S\_IFREG时，进一步
+判断文件的大小是否大于4096即可。
+
+
+\section{程序测试}
+
+运行结果如图~\ref{fig:results}。该结果和目录中文件的实际大小相符。可见实现是正确的。
+
+\begin{figure}[htb]
+	\centering
+	\caption{运行结果}
+	\label{fig:results}
+	\includegraphics[width=0.6\textwidth]{result.png}
+\end{figure}
+
+
+\appendix
+\clearpage
+\section*{附录：代码清单}
+\addcontentsline{toc}{part}{附录：代码清单}
+\label{sec:code}
+
+\subsection{Makefile}
+
+\begin{lstlisting}[numbers=left,style=MakefileStyle,caption=Makefile,label={code:makefile}]
+OBJS = main.o \
+	   error.o \
+	   pathalloc.o \
+
+CC = gcc
+CFLAGS = -Wall -g -std=c99
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+myfind: $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o myfind
+
+all: myfind
+
+clean:
+	rm -f *.o myfind
+
+.PHONY: clean all
+\end{lstlisting}
+
+\subsection{myfind.c}
+
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=程序实现,label={code:impl}]
+#include "apue.h"
+#include <dirent.h>
+#include <limits.h>
+
+#include <libgen.h> // basename
+
+typedef int (Callback)(const char *, const struct stat *, int);
+
+static Callback simple_statistic;
+
+static int myftw(char *, Callback *);
+
+static int dopath(Callback *);
+
+static long nreg, ndir, nblk, nchr, nfifo, nslink, nsock, ntot, nless4k;
+
+#define NARGS 16
+
+int main(int argc, char *argv[])
+{
+	int ret;
+	if (!(argc == 2))
+	{
+		err_quit("usage: myfind <params>");
+	}
+
+	if (argc == 2)
+	{
+		ret = myftw(argv[1], simple_statistic);
+		ntot = nreg + ndir + nblk + nchr + nfifo + nslink + nsock;
+		if (ntot == 0)
+		{
+			ntot = 1;
+		}
+
+		printf("%ld", nless4k);
+	}
+
+	return ret;
+}
+
+#define FTW_F 1
+#define FTW_D 2
+#define FTW_DNR 3
+#define FTW_NS 4
+
+static char *fullpath;
+static size_t pathlen;
+
+static int myftw(char *pathname, Callback *func)
+{
+	fullpath = path_alloc(&pathlen);
+
+	if (pathlen <= strlen(pathname))
+	{
+		pathlen = strlen(pathname) * 2;
+		if ((fullpath = realloc(fullpath, pathlen)) == NULL)
+		{
+			err_sys("realloc failed");
+		}
+	}
+	strcpy(fullpath, pathname);
+	return (dopath(func));
+}
+
+static int dopath(Callback *func)
+{
+	struct stat statbuf;
+	struct dirent *dirp;
+	DIR *dp;
+	int ret, n;
+	if (lstat(fullpath, &statbuf) < 0)
+	{
+		return (func(fullpath, &statbuf, FTW_NS));
+	}
+	if (S_ISDIR(statbuf.st_mode) == 0)
+	{
+		return (func(fullpath, &statbuf, FTW_F));
+	}
+
+	if ((ret = func(fullpath, &statbuf, FTW_D)) != 0)
+	{
+		return (ret);
+	}
+	n = strlen(fullpath);
+	if (n + NAME_MAX + 2 > pathlen)
+	{
+		pathlen *= 2;
+		if ((fullpath = realloc(fullpath, pathlen)) == NULL)
+		{
+			err_sys("realloc failed");
+		}
+	}
+	fullpath[n++] = '/';
+	fullpath[n] = 0;
+	if ((dp = opendir(fullpath)) == NULL)
+	{
+		return (func(fullpath, &statbuf, FTW_DNR));
+	}
+	while ((dirp = readdir(dp)) != NULL)
+	{
+		if (strcmp(dirp->d_name, ".") == 0 || strcmp(dirp->d_name, "..") == 0)
+		{
+			continue;
+		}
+		strcpy(&fullpath[n], dirp->d_name);
+		if ((ret = dopath(func)) != 0)
+		{
+			break;
+		}
+	}
+	fullpath[n - 1] = 0;
+	if (closedir(dp) < 0)
+	{
+		err_ret("can't close directory %s", fullpath);
+	}
+	return (ret);
+}
+
+static int simple_statistic(const char *pathname, const struct stat *statptr, int type)
+{
+	switch (type)
+	{
+	case FTW_F:
+		switch (statptr->st_mode & S_IFMT)
+		{
+		case S_IFREG:
+			nreg++;
+			if (statptr->st_size > 4096)
+			{
+				nless4k++;
+			}
+			break;
+		case S_IFBLK:
+			nblk++;
+			break;
+		case S_IFCHR:
+			nchr++;
+			break;
+		case S_IFIFO:
+			nfifo++;
+			break;
+		case S_IFLNK:
+			nslink++;
+			break;
+		case S_IFSOCK:
+			nsock++;
+			break;
+		case S_IFDIR:
+			err_dump("for S_IFDIR for %s", pathname);
+		}
+		break;
+	case FTW_D:
+		ndir++;
+		break;
+	case FTW_DNR:
+		err_ret("can't read directory %s", pathname);
+		break;
+	case FTW_NS:
+		err_ret("stat error for %s", pathname);
+		break;
+	default:
+		err_dump("unknown type %d for pathname %s", type, pathname);
+	}
+	return 0;
+}
+\end{lstlisting}
+
+\end{spacing}
+
+\end{document}

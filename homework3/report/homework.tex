@@ -431,7 +431,7 @@ Shell的用户输入是一个字符串。为了有效地处理，我们首先需
 由于处理\texttt{fork}返回值的过程固定而重复，并且在Shell中的处理就是输出报错信息并停止执行。所以
 实现了\texttt{fork\_panic}函数来简化处理，其代码如代码~\ref*{code:forkpanic}。
 
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=fork\_panic,label={code:forkpanic}]
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=解释执行,label={code:forkpanic}]
 int fork_panic()
 {
 	int pid = fork();
@@ -469,7 +469,7 @@ run_command(rcmd->cmd);
 其实现片段如代码~\ref{code:pipe}。
 在主进程中，我们也需要等待两个子进程的结束。
 
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=fork\_panic,label={code:pipe}]
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=处理管道的执行,label={code:pipe}]
 pcmd = (pipe_command_t *)cmd;
 if (pipe(p) < 0)
 {
@@ -559,11 +559,11 @@ waitpid(pid2, NULL, 0);
 
 为了测试I/O重定向的功能，就需要测试对标准输入的重定向和对标准输出的重定向两个部分。我们首先将ls的结果重
 定向到文件\texttt{dir.txt}中，然后再将\texttt{dir.txt}的内容定向到\texttt{grep}的输入中，在其中
-查找串\texttt{error}。这样就可以测试I/O重定向的功能。实际的执行结果如图~\ref{fig:redirect}。
+查找串\texttt{error}。这样就可以测试I/O重定向的功能。实际的执行结果如图~\ref{fig:redirect_result}。
 \begin{figure}[htb]
 	\centering
 	\caption{I/O重定向结果}
-	\label{fig:results}
+	\label{fig:redirect_result}
 	\begin{subfigure}{0.4\textwidth}
 		\centering
 		\includegraphics[width=\textwidth]{stdin.png}
