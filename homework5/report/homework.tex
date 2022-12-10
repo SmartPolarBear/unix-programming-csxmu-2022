@@ -71,9 +71,9 @@
 %%%%%%%%%%%%%
 \newcommand{\StudentNumber}{22920202204622}  % Fill your student number here
 \newcommand{\StudentName}{熊恪峥}  % Replace your name here
-\newcommand{\PaperTitle}{实验（四） Shell程序设计和改进}  % Change your paper title here
+\newcommand{\PaperTitle}{实验（五） 哲学家就餐问题}  % Change your paper title here
 \newcommand{\PaperType}{Unix程序设计} % Replace the type of your report here
-\newcommand{\Date}{2022年11月4日}
+\newcommand{\Date}{2022年12月10日}
 \newcommand{\College}{信息学院}
 \newcommand{\CourseName}{Unix程序设计}
 %%%%%%%%%%%%%
@@ -250,386 +250,107 @@ backgroundcolor=\color{black!2},%
 
 \section{实验内容}
 
-简单Shell的设计和实现。要求：
-
+编制模拟“五个哲学家”问题的程序。程序语法：
+\begin{center}
+	\texttt{philosopher   [ -t  \textless time \textgreater ]	}
+\end{center}
+\textless time \textgreater是哲学家进餐和沉思的持续时间值，缺省值为2秒。
 \begin{enumerate}
-    \item 除了系统调用execve，不允许使用其他的exec函数。输入应当允许带多个参数(一行内可以表示)，不考虑通配符 (即“*”、“?”、“-”等等)的处理。
-    \item 输入错误命令能提示出错并进入下一轮接收命令状态。
-    \item 可以用Ctrl-C和Ctrl-$\backslash$ 结束简单Shell的运行。
-    \item 程序运行正确，提示简洁明确。
+    \item 五个哲学家的编号为$0\cdots4$，分别用五个进程独立模拟。
+	\item 程序的输出要简洁，仅输出每个哲学家进餐和沉思的信息。例如，当编号为3的哲学家在进餐时，就打印：philosopher 3 is eating。而当他在沉思时，则打印：philosopher 3 is thinking。除此之外不要输出其他任何信息。
 \end{enumerate}
 
-\section{最简单的Shell实现}
+\section{使用文件同步的实现}
 
-实现一个最简单的Shell只需要三步：首先从标准输入流中读入一整行数据并利用空格拆分，然后\texttt{fork}当前进程，最后用\texttt{execve}执行命令。最后使用\texttt{waitpid}等待子进程结束，然后再次读入命令。
+哲学家就餐问题是一种用于描述资源同步和解决方案的问题\cite{wiki:dpp}。
+该问题描述了五个哲学家围坐在一张圆桌周围，每个哲学家面前都有一碗饭和一根筷子。哲学家们的生活方式是交替地思考和进餐，思考时不使用筷子，
+进餐时需要使用两根筷子。当一个哲学家进餐时，他需要同时拿起左右两边的筷子，如果两边的筷子都被其他哲学家拿着，
+那么他就需要等待，直到两边的筷子都空闲下来。当一个哲学家拿起一根筷子时，他就会把它放在桌子上，以示其他哲学家可以拿起它。
+当一个哲学家进餐完毕，他会把两根筷子放回桌子上，然后开始思考\cite{wiki:Dining_philosophers_problem}，如图~\ref{fig:philosopher}所示。
+\footnote{图片：\url{https://en.wikipedia.org/wiki/Dining_philosophers_problem}}
 
-\subsection{运行效果}
-
-按这种思路实现的Shell运行结果如图~\ref{fig:minimal}，它可以通过用完整的绝对路径运行简单的Shell命令。
-\begin{figure}[htb]
+\begin{figure}[h]
 	\centering
-	\caption{最简单的Shell}
-	\label{fig:minimal}
-	\includegraphics[width=0.6\textwidth]{minimal.png}
-\end{figure}
-并且能够正确地传递命令行参数。
-
-\subsection{有什么问题}
-
-今天，当用户使用Shell的时候所期待的重要的功能并不是简单地运行相应的程序。而是看重Shell可以通过许多便利的高级功能实现对简单程序的组合，
-来方便一次完成批量、重复的操作。这是当今CLI相对GUI而言最主要的优点。显然，这些功能并不是简单地用空格拆分输入的命令就可以实现的。
-因此需要更进一步地设计处理输入的命令的流程。
-
-例如合法的Shell表达式\eqref{eq:shell_exp}，
-\begin{equation}
-	\label{eq:shell_exp}
-grep \ ab \ < \ test.txt \ | \ grep \ abc
-\end{equation}
-这条表达式先在文件test.txt中查找包含ab的行，然后再在这些行中查找包含abc的行。这个表达式中使用了管道符“\textbar”和I/O重定向符。
-为了正确处理这条Shell表达式，直接用空格拆分输入的命令是不够的。因为管道符和I/O重定向符的存在，对一条命令的处理不只是简单的从左向右
-依次扫描，而需要对输入的命令进行更进一步分析，首先执行管道符左边的命令，执行时进行I/O重定向，然后将标准输出的结果为输入传递给管道符右边的命令。
-再比如，Shell表达式\eqref{eq:shell_exp2}，
-\begin{equation}
-	\label{eq:shell_exp2}
-wget \ <some \ url> \ | \ grep \ error > log.txt \ \&
-\end{equation}
-这条表达式中使用了后台运行符“\&”，这个符号的作用是要求Shell启动程序后立刻返回为下一条指令就绪，而将命令放到后台运行，而不是等待命令执行完毕后再执行下一条命令。
-这个符号的效果对整条表达式起效，而非最后一部分的\texttt{grep}。这样一来，空格拆分、从左往右的处理方式就不再适用，否则会给出错误的结果。
-
-因此，\emph{当管道、I/O重定向、后台执行等功能嵌套混合使用时，Shell需要具有更强的对输入命令的分析能力，来处理不同表达式中存在的结合性和优先级。}
-
-\section{改进的Shell设计}
-
-\subsection{设计目标}
-
-为了改进Shell的设计，需要先定下合理的目标，因为现代Shell是一个极其复杂的系统，因此只能实现其中功能的一个子集。在这些功能中，最基础的是
-
-\begin{itemize}
-	\item 支持管道的处理
-	\item 支持I/O重定向的处理
-	\item 支持用括号等符号改变运行顺序
-	\item 支持Shell脚本语句结束的分号;的处理
-	\item 支持后台运行符号$\&$的处理
-\end{itemize}
-
-有了对这些功能的正确处理，就能实现绝大多数Shell所具有的、重要的基础功能。因此，这些功能是改进Shell设计的目标。而
-为了这些功能的实现，需要对输入的命令进行更进一步的分析，这个分析的过程需要进行词法分析、语法分析，然后形成一棵语法树，
-最后再对这棵语法树进行遍历，并运行相应的操作。为了符合Shell的一般规律，还需要实现在$PATH$环境变量中查找命令的功能。
-
-\section{词法分析}
-
-\subsection{词法分析的基本思想}
-
-Shell的用户输入是一个字符串。为了有效地处理，我们首先需要将其拆分成最小有意义的字符串单元，这些字符单元具有被赋予、能被识别的意义。
-这称之为一个Token，这个过程称之为词法分析\cite{aho2007compilers}。一个Token由名称和可选的Token值构成。在常见的编程语言中，Token包括标识符、运算符、关键字、字面量、分隔符等。
-在我们需要支持的Shell命令词法分析中，我们只需要支持标识符、分隔符（;、(、)）和运算符（\textbar、\textgreater、\textless）。
-
-例如表达式\eqref{eq:shell_exp}经过词法分析，就会变成Token序列\eqref{eq:shell_token}。
-
-\begin{multline}
-	\label{eq:shell_token}
-	[ (identifier,grep),(identifier,ab),(operator,<),(identifier,test.txt), \\ (operator,|),(identifier,grep),(identifier,abc) ]
-\end{multline}
-
-为了消除歧义，这里采用最长匹配的消歧义原则。即，当遇到一个Token的前缀是另一个Token的前缀时，选择最长的那个Token。
-
-\subsection{词法分析的实现}
-
-词法分析的实现代码见\nameref{sec:code}中的代码~\ref{code:scanner}。其中第一个参数是所需要词法分析的字符串的开头指针，
-也用于返回获取一个Token以后的位置；第二个参数是其结尾指针；
-后两个参数用于返回Token的开头和结尾位置。返回值代表Token类型，其中返回值若是字符'a'就代表终结符IDENTIFIER。
-该函数的执行结果就是从命令中取出一个Token。
-
-
-\section{语法分析}
-
-得到了Token序列，需要正确地组织这些Token来形成符合Shell命令语义的抽象语法树（AST）。这个过程需要语法分析\cite{aho2007compilers}。
-要进行语法分析，首先需要形式地定义Shell命令的语法规则，这种定义需要上下文无关语法。
-
-\subsection{上下文无关语法}
-
-上下文无关文法（CFG）是一种形式化的语法定义方法，它定义了一种语言的语法规则。上下文无关文法由四元组\eqref{eqn:cfg}定义。
-\begin{equation}
-	\label{eqn:cfg}
-	G=(\mathcal{V},\Sigma,\mathcal{R},\mathcal{S})
-\end{equation}
-其中，$\mathcal{V}$是非终结符的集合，$\Sigma$是终结符的集合，$\mathcal{R}$是从$\mathcal{V}$到$(\mathcal{V} \cup \Sigma)^*$的关系，使得$\exists \omega \in (\mathcal{V}\cup \Sigma)^*: (S,\omega)\in \mathcal{R}$,$\mathcal{S}$是开始符号。
-
-上下文无关文法具有足够强的表达力来表达大多数编程语言的语法规则。而巴克斯-诺尔范式（BNF)是上下文无关文法的一种常用表示。
-在Shell命令的语法分析中，我们需要通过CFG定义的是Shell命令的语法规则。根据我们需要支持的内容，我们需要支持括号表达式、重定向、管道等几种
-二元表达式、后台运行$\&$和行结束;等几种一元表达式，因此可以定义\eqref{eq:shell_cfg}的CFG。
-\begin{equation}
-	\label{eq:shell_cfg}
-	\begin{aligned}
-		command &\rightarrow (line)^* \\
-		line &\rightarrow pipe \operatorname{|} back  \operatorname{|} list \\
-		back &\rightarrow line \operatorname{'\&'} \\
-		list &\rightarrow list \operatorname{';'} \\
-		pipe &\rightarrow exec \operatorname{|} pipe \\ 
-		exec &\rightarrow paren \operatorname{|} redirect \operatorname{|} IDENTIFIER (\operatorname{'-'}IDENTIFIER)^*\\
-		paren &\rightarrow \operatorname{'('} redirect \operatorname{')'} \\
-		redirect &\rightarrow exec (\operatorname{'>'}\operatorname{|}\operatorname{'>>'}) IDENTIFIER \operatorname{|} exec \operatorname{'<'} IDENTIFIER \\
-	\end{aligned}	
-\end{equation}
-根据\eqref{eq:shell_cfg}的定义对表达式\eqref{eq:shell_exp}进行语法分析，得到的AST如图~\ref{fig:shell_ast}所示。
-
-\begin{figure}[htb]
-	\centering
-	\caption{命令\eqref{eq:shell_exp}的AST}
-	\label{fig:shell_ast}
-	\begin{tikzpicture}[thick,scale=0.9, every node/.style={scale=0.8}]
-		\node {pipe}
-            child {node {redir}
-                child {node {exec}
-					child{node {grep}}
-					child{node {abc}}
-                }
-                child [missing] {}
-                child {node {test.txt}
-                }
-            }    
-            child [missing] {} 
-            child [missing] {}
-            child { node {exec}
-                child {node {grep}
-                }
-                child [missing] {}
-                child {node {ab}
-                }
-            };
-	\end{tikzpicture} 
+	\caption{哲学家就餐问题}
+	\label{fig:philosopher}
+	\includegraphics[width=0.4\textwidth]{philosopher.png}
 \end{figure}
 
-只要生成该AST，就可以对输入的命令进行解释执行了。因为Shell命令中我们支持的子集不需要语义分析。
-为了生成正确的AST，需要使用递归下降法实现正确的Parser进行语法分析。
+为了实现同步，有多种可以考虑的方法。使用文件是一种简单直接地方法。\texttt{lock.c}通过文件实现了一种互斥锁。
+如\nameref{sec:code}中的代码~\ref{code:lock}所示。为了获取锁，程序就会使用\texttt{O\_EXCL}标志
+尝试创建对应的文件。如果此时已经有进程拥有这把锁，就会导致创建失败，因此尝试获取锁的进程就会休眠一段时间
+再试。这样就实现了互斥锁的效果。为了释放锁，进程只需要删除对应的文件即可。
 
-\subsection{递归下降法}
+使用这种互斥锁的方法，可以实现哲学家就餐问题。如\nameref{sec:code}中的代码~\ref{code:phi1}所示。
+在这个程序中，每个哲学家都是一个进程，每个进程都会尝试获取左右两边的筷子，如果获取成功，就会进餐。
+在这个实现中，解决死锁问题的方法是“指定一个哲学家，它获取两把筷子的顺序和其他人相反。”。这种方法本质上
+是一种“资源分级”的解决方案。它相当于给筷子A、B、C、D、E赋予优先级，然后要求各哲学家都先获取优先级低的筷子，
+再获取优先级高的筷子。这样就可以避免死锁的发生。
 
-递归下降法是一种自上而下的语法分析方法，它的基本思想是：从文法的开始符号开始，逐步推导出输入串的语法结构。
-递归下降法的实现需要使用递归函数，每个递归函数对应文法中的一个非终结符，每个递归函数的功能是：
-从输入串中读取一个符号，判断该符号是否符合文法中对应的语法规则，
-如果符合，则继续读取下一个符号，直到读取完整个输入串。如果输入串中的符号不符合文法中对应的语法规则，则报错。
+这种方法能够避免死锁发生，但它不是公平的。尤其是当哲学家思考的时间不同的时候，可能思考时间较长的哲学家
+永远没有办法进餐。此外，利用文件实现互斥锁的方法也有一些缺点。首先，它需要创建文件，这样就会占用磁盘空间。
+文件I/O也是一种引入了额外开销的操作。
 
-本Shell的实现采用了语法制导的翻译（Syntax-directed Translation）。即整个语句的编译过程完全由Parser部分驱动。在运行
-语法分析的过程中同时进行词法分析。而不是对不同阶段进行明确的区分。这样做的原因是所支持的Shell命令的语法规则比较简单，不需要
-进行模块间非常明确的隔离就可以完成。同时，同时进行语法分析和语义分析有助于减少内存足迹（Memory Footprint），提高Shell运行
-的效率。
+为了解决后者的问题，可以使用\textbf{信号量}。
 
-在这一过程中，语法错误错误的命令输入会被发现，然后输出错误信息。而路径错误等语义上的错误会在运行时被发现。
+\section{使用信号量优化上述实现}
 
-本Shell的语法分析实现位于\texttt{parser.c}中，其中\texttt{parse\_line}函数对应文法中的\texttt{line}非终结符，以此类推。
-具体见代码实现，或者\nameref{sec:code}中的代码~\ref{code:parser}。
+信号量（Semaphores）是一种常见的同步原语（Primitives）。信号量是一个变量或者抽象数据类型，它的作用是用来控制多个线程或进程对共享资源的访问，
+避免并行系统中的关键资源被多个进程同时访问而导致的不一致性。信号量的值是一个非负整数，它可以表示共享资源的数量。POSIX API提供了
+创建可以在进程间共享的信号量的方法。
 
-\section{解释执行}
+信号量的基本操作可以被称为P操作和V操作。P操作是“等待”操作，它会使信号量的值减1。如果信号量的值为0，那么P操作会使进程休眠，
+直到信号量的值大于0。V操作是“释放”操作，它会使信号量的值加1。如果有进程在等待信号量，那么V操作会唤醒一个等待进程。对应的POSIX API
+如表~\ref{tbl:sem}所示。
 
-得到了抽象语法树，就可以对输入的命令进行解释执行了。
-这个过程需要对抽象语法树进行遍历，然后对遍历到的节点进行相应的操作。这是对树状结构的深度优先遍历。
-具体的过程在\texttt{main.c}的\texttt{run\_command}中，它判断\texttt{command\_t}中的类型
-字段，然后转换成正确的结构体类型，最后对相应的表达式进行执行，执行时会对自身进行递归调用。
+\begin{table}[htbp]
+	\centering
+	\caption{信号量的POSIX API}
+	\label{tbl:sem}
+	\begin{tabular}{c|c|c}
+		\toprule
+		\hline
+		\textbf{函数} & \textbf{功能} & \textbf{返回值} \\
+		\hline
+		sem\_init & 初始化信号量 & 0 \\
+		\hline
+		sem\_wait & P操作 & 0 \\
+		\hline
+		sem\_post & V操作 & 0 \\
+		\hline
+		sem\_destroy & 销毁信号量 & 0 \\
+		\hline
+		\bottomrule
+	\end{tabular}
+\end{table}
 
-在这一阶段会通过\texttt{fork}创建子进程，在子进程中通过\texttt{execve}对相应的可执行文件进行执行。
-由于处理\texttt{fork}返回值的过程固定而重复，并且在Shell中的处理就是输出报错信息并停止执行。所以
-实现了\texttt{fork\_panic}函数来简化处理，其代码如代码~\ref*{code:forkpanic}。
+使用信号量的实现如\nameref{sec:code}中的代码~\ref{code:sem}所示。
 
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=解释执行,label={code:forkpanic}]
-int fork_panic()
-{
-	int pid = fork();
-	if (pid < 0)
-	{
-		err_exit(pid, "fork");
-	}
-	return pid;
-}
-\end{lstlisting}
+\section{另一种解决方案}
 
-\subsection{执行I/O重定向}
+除了限定哲学家中同时存在左撇子和右撇子，还可以通过限制能吃饭的哲学家的数量来避免死锁\cite{stallings2012operating}。这种方法的思路是，当有哲学家想要进餐的时候，
+需要进入“餐厅”，餐厅仅限4个人，这样每人都有足够的叉子。如果餐厅已经满了，那么哲学家就需要等待。当有哲学家离开餐厅的时候，餐厅就会有空位，这时候可以让等待的哲学家进入餐厅。
 
-为了执行I/O重定向，就需要将标准输入输出的文件描述符重新打开到相应的文件中，如代码~\ref{code:ioredir}。
+这样，就可以用初始值为4的信号量来表示餐厅的空位数。当哲学家想要进入餐厅的时候，就需要执行P操作，如果餐厅有空位，那么P操作就会成功，哲学家就可以进入餐厅。当哲学家离开餐厅的时候，就需要执行V操作，这样餐厅的空位数就会加1，可以让等待的哲学家进入餐厅。
 
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=I/O重定向,label={code:ioredir}]
-rcmd = (redir_command_t *)cmd;
-fd = open(rcmd->file, rcmd->mode | O_SYNC | O_TRUNC);
-if (fd < 0)
-{
-	err_exit(fd, "open %s failed\n", rcmd->file);
-}
-dup2(fd, rcmd->fd);
-close(fd);
-run_command(rcmd->cmd);
-\end{lstlisting}
-
-
-\subsection{执行管道}
-
-管道是一种重要的Shell特性，它可以将一个命令的输出作为另一个命令的输入。一个进程在管道中写入的内容会被另一个
-进程读取，实现了一种进程间通信机制。管道的实现需要使用\texttt{pipe}函数创建管道，然后使用\texttt{dup2}函数将管道的
-读写端重定向到两个进程的标准输入输出上。因此我们创建两个子进程，进行相应的重定向，然后在两个子进程中分别递归调用来执行
-\texttt{pipe} AST节点的左右两个操作数。
-其实现片段如代码~\ref{code:pipe}。
-在主进程中，我们也需要等待两个子进程的结束。
-
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=处理管道的执行,label={code:pipe}]
-pcmd = (pipe_command_t *)cmd;
-if (pipe(p) < 0)
-{
-	err_quit("pipe");
-}
-if ((pid1 = fork_panic()) == 0)
-{
-	dup2(p[1], STDOUT_FILENO);
-	close(p[0]);
-	close(p[1]);
-	run_command(pcmd->left);
-}
-if ((pid2 = fork_panic()) == 0)
-{
-	dup2(p[0], STDIN_FILENO);
-	close(p[0]);
-	close(p[1]);
-	run_command(pcmd->right);
-}
-close(p[0]);
-close(p[1]);
-waitpid(pid1, NULL, 0);
-waitpid(pid2, NULL, 0);
-\end{lstlisting}
-
-\subsection{后台执行}
-
-支持后台执行符号\texttt{\&}，即在命令后面加上\texttt{\&}，可以使命令在后台执行，而不会阻塞Shell的执行。
-这一功能的实现相当简单。在执行之后不经过\texttt{wait}即返回，这样就不会阻塞Shell的执行。
-
-其它解释执行阶段的具体实现见代码，或者\nameref{sec:code}中的代码~\ref{code:executor}。
-
-
-\section{从环境变量$PATH$中查找程序}
-
-在Shell中，我们可以直接输入程序名，而不需要输入程序的绝对路径，Shell会自动从环境变量$PATH$中查找程序。
-这是Shell最重要的功能之一。为了实现这一功能，我们再进行\texttt{execve}前也必须进行查找。
-
-本实现中查找$PATH$环境变量内容的函数为\texttt{find\_in\_path}，其代码位于\texttt{findcmd.c}中，内容如
-\nameref{sec:code}中的代码~\ref*{code:findpath}。它的实现原理非常简单。首先，Linux下的$PATH$环境变量都是以
-冒号分隔的，所以我们可以通过\texttt{strtok}函数将其分割成多个字符串，然后利用上次实验中使用到的$path\_alloc$
-函数分配路径的内存空间，最后将分割出来的字符串拼接到路径后面，然后用$fstat$判断该路径下是否存在该文件，如果存在则返回该路径。
-这样查找到的就是首个匹配的文件。
-
-\section{遇到的问题和解决方法}
-
-在实现以上功能时，所遇到的问题就是I/O重定向不正常工作。
-
-\subsection{I/O重定向不正常工作}
-
-这个问题的来源是因为误以为\texttt{open}打开的文件描述符是会选择最小的可用的文件描述符，但是实际上
-这种假设在一些内核版本中成立，而在一些内核中并不是这样的。因此，不能依赖先\texttt{close}相应的
-标准输入输出文件流，然后再\texttt{open}文件，这样会导致文件描述符错误，使得I/O重定向失败。
-
-正确的方式是调用\texttt{dup2}函数，将文件描述符复制到标准输入输出文件流的文件描述符，
-然后关闭\texttt{open}返回的相应描述符。这样就可以保证文件描述符正确。
+这样的实现如\nameref{sec:code}中的代码~\ref{code:sem2}所示。
 
 \section{运行效果}
 
-\subsection{简单的命令}
-
-运行简单的命令，如纯粹地运行某一程序、或者加入简单的参数的效果如图~\ref{fig:simple}所示。
-\begin{figure}[htb]
+以上三种实现的运行效果都大致如图~\ref{fig:res}所示。
+\begin{figure}[h]
 	\centering
-	\caption{简单的命令}
-	\label{fig:simple}
-	\includegraphics[width=0.8\textwidth]{simple.png}
+	\caption{哲学家就餐问题}
+	\label{fig:res}
+	\includegraphics[width=0.4\textwidth]{res.png}
 \end{figure}
-可见Shell能从$PATH$中查找到相应的程序，然后使得程序能够正常运行。命令行参数，
-例如\texttt{--version}能够被正确解析然后传入\texttt{gcc}程序中。
-
-\subsection{管道}
-
-使用管道连接程序，从文本文件\texttt{test.txt}中读取内容，然后将先查找包含
-\texttt{abc}的结果，再查找包含\texttt{ab}的结果，最后将结果输出到标准输出流中，
-显示在终端上。这一功能可以使用管道符连接一个\texttt{cat}命令和两个\texttt{grep}命令完成。
-实际的执行结果如图~\ref{fig:pipe}
-\begin{figure}[htb]
-	\centering
-	\caption{Pipe}
-	\label{fig:pipe}
-	\includegraphics[width=0.4\textwidth]{pipe.png}
-\end{figure}
-可见，Shell能够正确地将管道符连接的命令的输入输出流连接起来，然后最右侧的\texttt{grep}输出了正确的结果。
-
-\subsection{I/O重定向}
-
-为了测试I/O重定向的功能，就需要测试对标准输入的重定向和对标准输出的重定向两个部分。我们首先将ls的结果重
-定向到文件\texttt{dir.txt}中，然后再将\texttt{dir.txt}的内容定向到\texttt{grep}的输入中，在其中
-查找串\texttt{error}。这样就可以测试I/O重定向的功能。实际的执行结果如图~\ref{fig:redirect_result}。
-\begin{figure}[htb]
-	\centering
-	\caption{I/O重定向结果}
-	\label{fig:redirect_result}
-	\begin{subfigure}{0.4\textwidth}
-		\centering
-		\includegraphics[width=\textwidth]{stdin.png}
-		\caption{重定向标准输入}
-		\label{fig:f2}
-	\end{subfigure}
-	\begin{subfigure}{0.4\textwidth}
-		\centering
-		\includegraphics[width=\textwidth]{stdout.png}
-		\caption{重定向标准输出}
-		\label{fig:f3}
-	\end{subfigure}
-\end{figure}
-可见，Shell能够正确地将标准输入重定向到文件中，然后将文件的内容作为标准输入传入\texttt{grep}程序中。
-这表明I/O重定向的两个方向都被Shell正确地实现了。
-
-\subsection{后台执行}
-
-为了测试后台运行，我们使用\texttt{wget}命令对文件进行下载来模拟长时操作。然后使用\&符号将其放到后台执行。
-运行结果如图~\ref{fig:background}所示。
-\begin{figure}[htb]
-	\centering
-	\caption{后台执行}
-	\label{fig:background}
-	\includegraphics[width=0.4\textwidth]{back.png}
-\end{figure}
-可以发现，执行wget之后，Shell会立即返回，而不会等待wget的执行结果。这是出现了Shell提示符"\%"。
-这表示后台执行的功能得到了正确的实现。
-
-\section{软件工程上的处理}
-
-为了对命令进行更好的解析处理，该Shell实现的代码规模相对较大。为了有效地进行管理，保证
-可扩展性和可维护性，采用了一些措施。
-
-\subsection{利用内存布局实现伪多态}
-
-为了适应抽象语法树的节点有多个不同类型的特点，在设计抽象语法树的节点的数据结构时，可以通过指针类型转换的规则
-模拟“类型擦除”来实现一定的多态能力。这一点在主要使用C语言的大型项目，例如Linux内核中得到了大量的应用。
-
-这种方式主要的原理如图~\ref{fig:poly}所示。
-\begin{figure}[ht]
-	\centering
-	\caption{AST节点结构}
-	\label{fig:poly}
-	\includegraphics[width=0.6\textwidth]{poly.png}
-\end{figure}
-每一个AST节点中都具有一个\texttt{command\_t}类型的“头”结构，当我们传递一个AST节点的指针时，直接传递
-\texttt{command\_t}类型的指针即可。在需要使用具体的AST节点类型时，可以通过其中的字段进行判断，
-然后利用指针类型转换的规则\cite{iso1999iso}将\texttt{command\_t}转换成对应的具体类型。
-
-这种方法在逻辑上实现了一种“is-a”的继承关系。这解决了缺乏面向对象程序设计能力的C语言当代码库的规模
-扩大时面对大量类型不容易管理的问题。
-
-\subsection{恰当分割文件}
-
-为了保证代码的可读性，每个文件不宜太长\cite{martin2009clean}。因此在这个Shell实现中，将代码分割成了多个文件，每个文件
-大致负责一个功能的实现，较好地控制了文件的长度。
-
-为了有效地组织编译，使用了Makefile对编译进行处理。
+可见，所有哲学家都能正常进餐，这些实现都是正确的。
 
 \section{实验总结}
 
-这次实验中，我实现了可以处理复杂Shell命令语法的Shell。进一步了解了Shell这一类UNIX操作系统中
-不可或缺、极其重要的组件是如何实现的。在实现过程中，我使用语法分析-语义分析这一依赖于编译原理的方法
-对Shell命令进行解析，然后在抽象语法树中进行遍历和执行的方法，实现了除简单运行程序之外的重要的
-Shell基础设施。对Shell的实现有了更加深入的理解。
+本次实现通过解决哲学家就餐问题，让我了解到了多进程同步的基本概念和方法。
+通过本次实验，我学会了使用文件和信号量来实现进程同步，并解决哲学家就餐问题。
+了解到了在并发的系统中保护Critical Section的基本方法。
 
 \appendix
 
@@ -641,509 +362,291 @@ Shell基础设施。对Shell的实现有了更加深入的理解。
 \bibliography{reference}
 
 \clearpage
-\section*{附录：部分代码清单、文件结构和说明}
+\section*{附录：代码清单}
 \addcontentsline{toc}{part}{附录：代码清单}
 \label{sec:code}
 
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=\texttt{lock.c},label={code:lock}]
+#include	<sys/types.h>
+#include	<sys/stat.h>
+#include	<fcntl.h>
+#include	<unistd.h>
+#include	"apue.h"
 
-\subsection{文件结构和说明}
-
-为了保证每个文件不太长、便于管理和调试，将代码分割成了多个文件。每个文件大致负责一个功能的实现。文件和对应
-实现的功能如表~\ref{tbl:file}
-
-\begin{table}[htb]
-	\centering
-	\linespread{1.5}
-	\caption{文件结构和说明}
-	\label{tbl:file}
-	\begin{tabular}{c|c}
-		\toprule
-		\hline
-		文件名 & 功能 \\
-		\hline
-		apue.h, error.c, pathalloc.c & 书附带用于处理错误、分配路径内存的函数。 \\
-		\hline
-		main.c & 主函数，调用语法分析、词法分析并解释执行。 \\
-		\hline
-		findcmd.c & 在$PATH$中查找命令的路径。 \\
-		\hline
-		parser.c, parser.h & 语法分析、抽象语法树的构造。 \\
-		\hline
-		scanner.c, scanner.h & 词法分析。 \\
-		\hline
-		\bottomrule
-	\end{tabular}
-\end{table}
-
-\subsection{部分代码清单}
-
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=词法分析,label={code:scanner}]
-static const char whitespace[] = " \t\r\n\v";
-static const char symbols[] = "<|>&;()";
-
-int get_token(char **ps, char *es, char **q, char **eq)
+void initlock(const char *lockfile)
 {
-	char *s = *ps;
+	int	i;
 
-	while (s < es && strchr(whitespace, *s))
-		s++;
-
-
-	if (q)
-	{
-		*q = s;
-	}
-
-	int ret = *s;
-	switch (*s)
-	{
-	case 0:
-		break;
-	case '|':
-	case '(':
-	case ')':
-	case ';':
-	case '&':
-	case '<':
-		s++;
-		break;
-	case '>':
-		s++;
-		if (*s == '>')
-		{
-			ret = '+';
-			s++;
-		}
-		break;
-	default:
-		ret = 'a';
-		while (s < es && !strchr(whitespace, *s) && !strchr(symbols, *s))
-			s++;
-		break;
-	}
-	if (eq)
-	{
-		*eq = s;
-	}
-
-	while (s < es && strchr(whitespace, *s))
-		s++;
-
-	*ps = s;
-	return ret;
+	unlink(lockfile);
 }
 
-int peek(char **ps, char *es, char *toks)
+void lock(const char *lockfile)
 {
-	char *s;
+	int	fd;
+	while ( (fd = open(lockfile, O_RDONLY | O_CREAT | O_EXCL, FILE_MODE)) < 0)
+		sleep(1);
+	close(fd);
+}
 
-	s = *ps;
-	while (s < es && strchr(whitespace, *s))
-		s++;
-	*ps = s;
-	return *s && strchr(toks, *s);
+void unlock(const char *lockfile)
+{
+	unlink(lockfile);
 }
 \end{lstlisting}
 
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=语法分析,label={code:parser}]
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=使用文件实现,label={code:phi1}]
 //
-// Created by bear on 11/4/2022.
+// Created by bear on 12/3/2022.
 //
 #include "apue.h"
+#include "lock.h"
+#include "error.h"
 
-#include <stdlib.h>
-#include <fcntl.h>
+#include "sys/wait.h"
 
-#include "parser.h"
-#include "scanner.h"
+#define N 5
 
-static inline exec_command_t *make_exec_command(void)
+static char *forks[5] = {"fork0", "fork1", "fork2", "fork3", "fork4"};
+
+void putFork(int i)
 {
-	exec_command_t *cmd = malloc(sizeof(exec_command_t));
-	cmd->base.type = CMD_EXEC;
-	return cmd;
+	if (i == N - 1)
+	{
+		unlock(forks[0]);
+		unlock(forks[i]);
+	}
+	else
+	{
+		unlock(forks[i]);
+		unlock(forks[i + 1]);
+	}
 }
 
-static inline redir_command_t *make_redir_command(command_t *subcmd, char *file, char *efile, int mode, int fd)
+void takeFork(int i)
 {
-	redir_command_t *cmd = malloc(sizeof(redir_command_t));
-	cmd->base.type = CMD_REDIR;
-	cmd->cmd = subcmd;
-	cmd->file = file;
-	cmd->efile = efile;
-	cmd->mode = mode;
-	cmd->fd = fd;
-	return cmd;
+	if (i == N - 1)
+	{
+		lock(forks[0]);
+		lock(forks[i]);
+	}
+	else
+	{
+		lock(forks[i]);
+		lock(forks[i + 1]);
+	}
 }
 
-static inline pipe_command_t *make_pipe_command(command_t *left, command_t *right)
+void eating(int i, int nsecs)
 {
-	pipe_command_t *cmd = malloc(sizeof(pipe_command_t));
-	cmd->base.type = CMD_PIPE;
-	cmd->left = left;
-	cmd->right = right;
-	return cmd;
+	printf("philosopher %d is eating\n", i);
+	sleep(nsecs);
 }
 
-static inline list_command_t *make_list_command(command_t *left, command_t *right)
+void thinking(int i, int nsecs)
 {
-	list_command_t *cmd = malloc(sizeof(list_command_t));
-	cmd->base.type = CMD_LIST;
-	cmd->left = left;
-	cmd->right = right;
-	return cmd;
+	printf("philosopher %d is thinking\n", i);
+	sleep(nsecs);
 }
 
-static inline back_command_t *make_back_command(command_t *subcmd)
+void philosopher(int i, int nsecs)
 {
-	back_command_t *cmd = malloc(sizeof(back_command_t));
-	cmd->base.type = CMD_BACK;
-	cmd->cmd = subcmd;
-	return cmd;
+	for (;;)
+	{
+		thinking(i, nsecs);
+		takeFork(i);
+		eating(i, nsecs);
+		putFork(i);
+	}
 }
 
-command_t *parse_line(char **ps, char *es);
-command_t *parse_pipe(char **ps, char *es);
-command_t *parse_exec(char **ps, char *es);
-command_t *parse_redirs(command_t *cmd, char **ps, char *es);
-command_t *ensure_nulterm(command_t *cmd);
-
-command_t *
-parse_line(char **ps, char *es)
+int main(int argc, char **argv)
 {
-	command_t *cmd;
-
-	cmd = parse_pipe(ps, es);
-	while (peek(ps, es, "&"))
+	int nsecs = 0;
+	if (argc != 3 && argc != 1)
 	{
-		get_token(ps, es, 0, 0);
-		cmd = (command_t *)make_back_command(cmd);
-	}
-	if (peek(ps, es, ";"))
-	{
-		get_token(ps, es, 0, 0);
-		cmd = (command_t *)make_list_command(cmd, parse_line(ps, es));
-	}
-	return cmd;
-}
-
-command_t *
-parse_pipe(char **ps, char *es)
-{
-	command_t *cmd;
-
-	cmd = parse_exec(ps, es);
-	if (peek(ps, es, "|"))
-	{
-		get_token(ps, es, 0, 0);
-		cmd = (command_t *)make_pipe_command(cmd, parse_pipe(ps, es));
-	}
-	return cmd;
-}
-
-command_t *
-parse_redirs(command_t *cmd, char **ps, char *es)
-{
-	int tok;
-	char *q, *eq;
-
-	while (peek(ps, es, "<>"))
-	{
-		tok = get_token(ps, es, 0, 0);
-		if (get_token(ps, es, &q, &eq) != 'a')
-		{
-			err_quit("missing file for redirection");
-		}
-		switch (tok)
-		{
-		case '<':
-			cmd = (command_t *)make_redir_command(cmd, q, eq, O_RDONLY, STDIN_FILENO);
-			break;
-		case '>':
-			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, STDOUT_FILENO);
-			break;
-		case '+':  // >>
-			cmd = (command_t *)make_redir_command(cmd, q, eq, O_WRONLY | O_CREAT, STDOUT_FILENO);
-			break;
-		}
-	}
-	return cmd;
-}
-
-command_t *
-parse_paren(char **ps, char *es)
-{
-	command_t *cmd;
-
-	if (!peek(ps, es, "("))
-	{
-		err_quit("parse_paren");
-	}
-	get_token(ps, es, 0, 0);
-	cmd = parse_line(ps, es);
-	if (!peek(ps, es, ")"))
-	{
-		err_quit("syntax - missing )");
-	}
-	get_token(ps, es, 0, 0);
-	cmd = parse_redirs(cmd, ps, es);
-	return cmd;
-}
-
-command_t *
-parse_exec(char **ps, char *es)
-{
-	char *q, *eq;
-	int tok, argc;
-	exec_command_t *cmd;
-	command_t *ret;
-
-	if (peek(ps, es, "("))
-	{
-		return parse_paren(ps, es);
+		printf("usage: %s [-t <nsecs>]", argv[0]);
 	}
 
-	ret = (command_t *)make_exec_command();
-	cmd = (exec_command_t *)ret;
-
-	argc = 0;
-	ret = parse_redirs(ret, ps, es);
-	while (!peek(ps, es, "|)&;"))
+	if (strcmp(argv[2], "-t") == 0)
 	{
-		if ((tok = get_token(ps, es, &q, &eq)) == 0)
-		{
-			break;
-		}
-		if (tok != 'a')
-		{
-			err_quit("syntax");
-		}
-		cmd->argv[argc] = q;
-		cmd->eargv[argc] = eq;
-		argc++;
-		if (argc >= MAXARGS)
-		{
-			err_quit("too many args");
-		}
-		ret = parse_redirs(ret, ps, es);
+		nsecs = atoi(argv[3]);
 	}
-	cmd->argv[argc] = 0;
-	cmd->eargv[argc] = 0;
-	return ret;
-}
-
-// NUL-terminate all the counted strings.
-command_t *
-ensure_nulterm(command_t *cmd)
-{
-	int i;
-	back_command_t *bcmd;
-	exec_command_t *ecmd;
-	list_command_t *lcmd;
-	pipe_command_t *pcmd;
-	redir_command_t *rcmd;
-
-	if (cmd == 0)
+	else
 	{
-		return 0;
+		nsecs = 2;
 	}
 
-	switch (cmd->type)
+	for (int i = 0; i < N; i++)
 	{
-	case CMD_EXEC:
-		ecmd = (exec_command_t *)cmd;
-		for (i = 0; ecmd->argv[i]; i++)
-			*ecmd->eargv[i] = 0;
-		break;
-
-	case CMD_REDIR:
-		rcmd = (redir_command_t *)cmd;
-		ensure_nulterm(rcmd->cmd);
-		*rcmd->efile = 0;
-		break;
-
-	case CMD_PIPE:
-		pcmd = (pipe_command_t *)cmd;
-		ensure_nulterm(pcmd->left);
-		ensure_nulterm(pcmd->right);
-		break;
-
-	case CMD_LIST:
-		lcmd = (list_command_t *)cmd;
-		ensure_nulterm(lcmd->left);
-		ensure_nulterm(lcmd->right);
-		break;
-
-	case CMD_BACK:
-		bcmd = (back_command_t *)cmd;
-		ensure_nulterm(bcmd->cmd);
-		break;
-	}
-	return cmd;
-}
-
-command_t *parse_command(char *cmdline)
-{
-	char *cbeg = cmdline, *cend = cmdline;
-	while (*cend)
-		cend++;
-
-	command_t *cmd = parse_line(&cbeg, cend);
-	peek(&cbeg, cend, "");
-	if (cbeg != cend)
-	{
-		err_quit("syntax error with leftovers: %s\n", cbeg);
-	}
-	ensure_nulterm(cmd);
-	return cmd;
-}
-\end{lstlisting}
-
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=解释执行,label={code:executor}]
-void run_command(command_t *cmd)
-{
-	int p[2];
-	int err;
-	int fd;
-	int pid, pid1, pid2;
-
-	back_command_t *bcmd;
-	exec_command_t *ecmd;
-	list_command_t *lcmd;
-	pipe_command_t *pcmd;
-	redir_command_t *rcmd;
-
-	if (cmd == 0)
-	{
-		exit(0);
-	}
-
-	switch (cmd->type)
-	{
-	default:
-		err_quit("run_command");
-
-	case CMD_EXEC:
-		ecmd = (exec_command_t *)cmd;
-		if (ecmd->argv[0] == 0)
-		{
-			exit(0);
-		}
-		char *name = find_in_path(ecmd->argv[0], getenv("PATH"));
-		err = execve(name, ecmd->argv, environ);
-		err_exit(err, "exec %s failed\n", ecmd->argv[0]);
-		break;
-
-	case CMD_REDIR:
-		rcmd = (redir_command_t *)cmd;
-		fd = open(rcmd->file, rcmd->mode | O_SYNC );
-		if (fd < 0)
-		{
-			err_exit(fd, "open %s failed\n", rcmd->file);
-		}
-		dup2(fd, rcmd->fd);
-		close(fd);
-		run_command(rcmd->cmd);
-		break;
-
-	case CMD_LIST:
-		lcmd = (list_command_t *)cmd;
-		pid = fork_panic();
+		pid_t pid = fork();
 		if (pid == 0)
 		{
-			run_command(lcmd->left);
-		}
-		waitpid(pid, NULL, 0);
-		run_command(lcmd->right);
-		break;
-
-	case CMD_PIPE:
-		pcmd = (pipe_command_t *)cmd;
-		if (pipe(p) < 0)
-		{
-			err_quit("pipe");
-		}
-		if ((pid1 = fork_panic()) == 0)
-		{
-			dup2(p[1], STDOUT_FILENO);
-			close(p[0]);
-			close(p[1]);
-			run_command(pcmd->left);
-		}
-		if ((pid2 = fork_panic()) == 0)
-		{
-			dup2(p[0], STDIN_FILENO);
-			close(p[0]);
-			close(p[1]);
-			run_command(pcmd->right);
-		}
-		close(p[0]);
-		close(p[1]);
-		waitpid(pid1, NULL, 0);
-		waitpid(pid2, NULL, 0);
-		break;
-
-	case CMD_BACK:
-		bcmd = (back_command_t *)cmd;
-		if (fork_panic() == 0)
-		{
-			run_command(bcmd->cmd);
-		}
-		break;
-	}
-	exit(0);
-}
-\end{lstlisting}
-
-\begin{lstlisting}[numbers=left,style=CppStyle,caption=find\_in\_path,label={code:findpath}]
-char *find_in_path(char *exe, char *pathlist)
-{
-	char *p, *q, *path;
-	struct stat st;
-
-	if (strchr(exe, '/'))
-	{
-		if (stat(exe, &st) < 0)
-		{
-			return 0;
-		}
-		return exe;
-	}
-
-	for (p = pathlist; *p; p = q + 1)
-	{
-		if ((q = strchr(p, ':')) == 0)
-		{
-			q = p + strlen(p);
-		}
-		if (q == p)
-		{
-			path = ".";
-		}
-		else
-		{
-			path = p;
-		}
-		size_t buf_len = 0;
-		char *buf = path_alloc(&buf_len);
-		memset(buf, 0, buf_len);
-
-		if ((q - p) + 1 + strlen(exe) + 1 > buf_len)
-		{
-			free(buf);
-			continue;
-		}
-		snprintf(buf, buf_len, "%.*s/%s", (int)(q - p), path, exe);
-
-		int err = stat(buf, &st);
-		if (err == 0)
-		{
-			return buf;
+			philosopher(i, nsecs);
 		}
 	}
+
+	wait(NULL);
 	return 0;
 }
 \end{lstlisting}
+
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=使用信号量实现,label={code:sem}]
+#define N 5
+
+static sem_t forks_sems[5];
+
+void init_sems()
+{
+	for (int i = 0; i < N; i++)
+	{
+		if (sem_init(&forks_sems[i], 1, 1) != 0)
+		{
+			err_sys("sem_open error");
+		}
+	}
+}
+
+void destroy_sems()
+{
+	for (int i = 0; i < N; i++)
+	{
+		sem_destroy(&forks_sems[i]);
+	}
+}
+
+void putFork(int i)
+{
+	if (i == N - 1)
+	{
+		sem_post(&forks_sems[0]);
+		sem_post(&forks_sems[i]);
+	}
+	else
+	{
+		sem_post(&forks_sems[i]);
+		sem_post(&forks_sems[i + 1]);
+	}
+}
+
+void takeFork(int i)
+{
+	if (i == N - 1)
+	{
+		sem_wait(&forks_sems[0]);
+		sem_wait(&forks_sems[i]);
+	}
+	else
+	{
+		sem_wait(&forks_sems[i]);
+		sem_wait(&forks_sems[i + 1]);
+	}
+}
+
+void eating(int i, int nsecs)
+{
+	printf("philosopher %d is eating\n", i);
+	sleep(nsecs);
+}
+
+void thinking(int i, int nsecs)
+{
+	printf("philosopher %d is thinking\n", i);
+	sleep(nsecs);
+}
+
+void philosopher(int i, int nsecs)
+{
+	for (;;)
+	{
+		thinking(i, nsecs);
+		takeFork(i);
+		eating(i, nsecs);
+		putFork(i);
+	}
+}
+\end{lstlisting}
+
+\begin{lstlisting}[numbers=left,style=CppStyle,caption=另一种实现,label={code:sem2}]
+	#define N 5
+
+static sem_t forks_sems[5];
+static sem_t room_sem;
+
+void init_sems()
+{
+	sem_init(&room_sem, 1, N - 1);
+	for (int i = 0; i < N; i++)
+	{
+		if (sem_init(&forks_sems[i], 1, 1) != 0)
+		{
+			err_sys("sem_open error");
+		}
+	}
+}
+
+void destroy_sems()
+{
+	sem_destroy(&room_sem);
+	for (int i = 0; i < N; i++)
+	{
+		sem_destroy(&forks_sems[i]);
+	}
+}
+
+void putFork(int i)
+{
+	if (i == N - 1)
+	{
+		sem_post(&forks_sems[0]);
+		sem_post(&forks_sems[i]);
+	}
+	else
+	{
+		sem_post(&forks_sems[i]);
+		sem_post(&forks_sems[i + 1]);
+	}
+}
+
+void takeFork(int i)
+{
+	if (i == N - 1)
+	{
+		sem_wait(&forks_sems[0]);
+		sem_wait(&forks_sems[i]);
+	}
+	else
+	{
+		sem_wait(&forks_sems[i]);
+		sem_wait(&forks_sems[i + 1]);
+	}
+}
+
+void eating(int i, int nsecs)
+{
+	printf("philosopher %d is eating\n", i);
+	sleep(nsecs);
+}
+
+void thinking(int i, int nsecs)
+{
+	printf("philosopher %d is thinking\n", i);
+	sleep(nsecs);
+}
+
+void philosopher(int i, int nsecs)
+{
+	for (;;)
+	{
+		thinking(i, nsecs);
+		sem_wait(&room_sem);
+		takeFork(i);
+		eating(i, nsecs);
+		putFork(i);
+		sem_post(&room_sem);
+	}
+}
+\end{lstlisting}
+
 
 \end{spacing}
 
